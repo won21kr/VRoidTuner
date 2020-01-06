@@ -8,6 +8,8 @@
 
 ## 導入手順
 
+[UniVRM](https://github.com/vrm-c/UniVRM) に依存しますので、まずこれがプロジェクトにインポート済みであることを前提とします。
+
 [Releases](https://github.com/but80/VRMHelper/releases) ページから `VRMHelper-v*.unitypackage` をダウンロードし、プロジェクトにインポートしてください。
 
 Pull Request を送っていただく場合は本リポジトリをforkし、以下のように既存のプロジェクトにサブモジュールとして取り込む形で変更を加えられます。
