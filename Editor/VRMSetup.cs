@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using UnityEngine;
 using UnityEditor;
@@ -24,21 +24,36 @@ namespace VRMHelper
 
             internal bool OverwriteDragForce = true;
 
-            [SerializeField, Range(0, 2)] private float _DragForceValue = 1;
-            public float DragForceValue
+            [SerializeField, Range(0, 2)] private float _DragForceOffset = .4f;
+            public float DragForceOffset
             {
-                get { return _DragForceValue; }
-                set { _DragForceValue = Mathf.Clamp(value, 0, 2); }
+                get { return _DragForceOffset; }
+                set { _DragForceOffset = Mathf.Clamp(value, 0, 2); }
+            }
+
+            [SerializeField, Range(0, 2)] private float _GravityPowerToDragForceRatio = .6f;
+            public float GravityPowerToDragForceRatio
+            {
+                get { return _GravityPowerToDragForceRatio; }
+                set { _GravityPowerToDragForceRatio = Mathf.Clamp(value, -2, 2); }
             }
 
             internal bool OverwriteStiffnessForce = false;
 
-            [SerializeField, Range(0, 2)] private float _StiffnessForceValue = 1;
-            public float StiffnessForceValue
+            [SerializeField, Range(0, 2)] private float _StiffnessForceOffset = 1f;
+            public float StiffnessForceOffset
             {
-                get { return _StiffnessForceValue; }
-                set { _StiffnessForceValue = Mathf.Clamp(value, 0, 2); }
+                get { return _StiffnessForceOffset; }
+                set { _StiffnessForceOffset = Mathf.Clamp(value, 0, 2); }
             }
+
+            [SerializeField, Range(0, 2)] private float _GravityPowerToStiffnessForceRatio = -1f;
+            public float GravityPowerToStiffnessForceRatio
+            {
+                get { return _GravityPowerToStiffnessForceRatio; }
+                set { _GravityPowerToStiffnessForceRatio = Mathf.Clamp(value, -2, 2); }
+            }
+
 
             internal bool AddHeadColliders = true;
             internal bool ShuffleSpringBoneGizmoColors = true;
@@ -158,10 +173,12 @@ namespace VRMHelper
             {
                 GUI.enabled = _selectedInProject;
                 EditorGUILayout.LabelField("「揺れものが思い通りに揺れない」対策", caption);
-                _params.OverwriteDragForce = EditorGUILayout.Toggle("DragForce を変更", _params.OverwriteDragForce);
-                _params.DragForceValue = EditorGUILayout.FloatField("DragForce の値", _params.DragForceValue);
-                _params.OverwriteStiffnessForce = EditorGUILayout.Toggle("StiffnessForce を変更", _params.OverwriteStiffnessForce);
-                _params.StiffnessForceValue = EditorGUILayout.FloatField("StiffnessForce の値", _params.StiffnessForceValue);
+                _params.OverwriteDragForce = EditorGUILayout.Toggle("DragForce（抵抗力）を変更", _params.OverwriteDragForce);
+                _params.DragForceOffset = EditorGUILayout.FloatField("        基準値", _params.DragForceOffset);
+                _params.GravityPowerToDragForceRatio = EditorGUILayout.FloatField("        + GravityPower ×", _params.GravityPowerToDragForceRatio);
+                _params.OverwriteStiffnessForce = EditorGUILayout.Toggle("StiffnessForce（復元力）を変更 ※非推奨", _params.OverwriteStiffnessForce);
+                _params.StiffnessForceOffset = EditorGUILayout.FloatField("        基準値", _params.StiffnessForceOffset);
+                _params.GravityPowerToStiffnessForceRatio = EditorGUILayout.FloatField("        + GravityPower ×", _params.GravityPowerToStiffnessForceRatio);
                 EditorGUILayout.HelpBox(
                     "髪と思しき（comment が空文字の）全 VRMSpringBone を対象にパラメータを上書き変更します。",
                     MessageType.Info);
@@ -277,8 +294,9 @@ namespace VRMHelper
             {
                 if (cmp.m_comment == "")
                 {
-                    if (_params.OverwriteDragForce) cmp.m_dragForce = _params.DragForceValue;
-                    if (_params.OverwriteStiffnessForce) cmp.m_stiffnessForce = _params.StiffnessForceValue;
+                    var g = cmp.m_gravityPower;
+                    if (_params.OverwriteDragForce) cmp.m_dragForce = _params.DragForceOffset + g * _params.GravityPowerToDragForceRatio;
+                    if (_params.OverwriteStiffnessForce) cmp.m_stiffnessForce = _params.StiffnessForceOffset + g * _params.GravityPowerToStiffnessForceRatio;
                 }
                 if (_params.ShuffleSpringBoneGizmoColors)
                 {
@@ -300,8 +318,10 @@ namespace VRMHelper
                         // 制作者環境でのリファレンス値
                         var refDefaultOffset = new Vector3(0f, 0.09858859f, -0.01234177f); // VRoid Studio が出力した球
                         float refDefaultRadius = 0.09824938f;
-                        var refSecondOffset = new Vector3(0f, 0.05687952f, 0.01470231f); // 顎寄り中央に追加した球
-                        float refSecondRadius = 0.078f;
+                        var refNoseOffset = new Vector3(0f, 0.05687952f, 0.01470231f); // 鼻寄り中央に追加した球
+                        float refNoseRadius = 0.078f;
+                        var refForeheadOffset = new Vector3(0f, 0.11f, 0.003f); // 額寄り中央に追加した球
+                        float refForeheadRadius = 0.098f;
                         var refCheekOffset = new Vector3(0.02053911f, 0.0374347f, 0.04125598f); // +X側の頬寄りに追加した球
                         float refCheekRadius = 0.054f;
 
@@ -311,18 +331,23 @@ namespace VRMHelper
                         var scaler = defaultRadius / refDefaultRadius; // リファレンス値に対するサイズ比
                         // TODO: 顔の縦横比等を考慮
 
-                        // 顎寄り中央に追加する球
-                        var secondRadius = refSecondRadius * scaler;
-                        var secondOffset = defaultOffset + (refSecondOffset - refDefaultOffset) * scaler;
+                        // 鼻寄り中央に追加する球
+                        var noseRadius = refNoseRadius * scaler;
+                        var noseOffset = defaultOffset + (refNoseOffset - refDefaultOffset) * scaler;
+
+                        // 額寄り中央に追加する球
+                        var foreheadRadius = refForeheadRadius * scaler;
+                        var foreheadOffset = defaultOffset + (refForeheadOffset - refDefaultOffset) * scaler;
 
                         // 左右の頬寄りに追加する球
                         var cheekRadius = refCheekRadius * scaler;
                         var cheekOffsetL = defaultOffset + (refCheekOffset - refDefaultOffset) * scaler;
                         var cheekOffsetR = new Vector3(-cheekOffsetL.x, cheekOffsetL.y, cheekOffsetL.z);
 
-                        cmp.Colliders = new VRMSpringBoneColliderGroup.SphereCollider[4]{
+                        cmp.Colliders = new VRMSpringBoneColliderGroup.SphereCollider[5]{
                             cmp.Colliders[0],
-                            new VRMSpringBoneColliderGroup.SphereCollider{ Radius = secondRadius, Offset = secondOffset },
+                            new VRMSpringBoneColliderGroup.SphereCollider{ Radius = noseRadius, Offset = noseOffset },
+                            new VRMSpringBoneColliderGroup.SphereCollider{ Radius = foreheadRadius, Offset = foreheadOffset },
                             new VRMSpringBoneColliderGroup.SphereCollider{ Radius = cheekRadius, Offset = cheekOffsetL },
                             new VRMSpringBoneColliderGroup.SphereCollider{ Radius = cheekRadius, Offset = cheekOffsetR },
                         };

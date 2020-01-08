@@ -1,5 +1,7 @@
 # VRMHelper
 
+Unity 2019.2.17f にて動作確認を行っております。
+
 詳細は [こちらの記事](https://qiita.com/but80/items/3cc28cd874764daf3e58) をお読みください。
 
 ## 導入手順
