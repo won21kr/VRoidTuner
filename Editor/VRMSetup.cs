@@ -318,10 +318,12 @@ namespace VRMHelper
                         // 制作者環境でのリファレンス値
                         var refDefaultOffset = new Vector3(0f, 0.09858859f, -0.01234177f); // VRoid Studio が出力した球
                         float refDefaultRadius = 0.09824938f;
+                        var refCenterOffset = new Vector3(0f, 0.1222353f, -0.01234177f); // VRoid Studio が出力した球の調整
+                        float refCenterRadius = 0.09824938f;
                         var refNoseOffset = new Vector3(0f, 0.05687952f, 0.01470231f); // 鼻寄り中央に追加した球
                         float refNoseRadius = 0.078f;
-                        var refForeheadOffset = new Vector3(0f, 0.11f, 0.003f); // 額寄り中央に追加した球
-                        float refForeheadRadius = 0.098f;
+                        var refForeheadOffset = new Vector3(0f, 0.11f, 0.008f); // 額寄り中央に追加した球
+                        float refForeheadRadius = 0.093f;
                         var refCheekOffset = new Vector3(0.02053911f, 0.0374347f, 0.04125598f); // +X側の頬寄りに追加した球
                         float refCheekRadius = 0.054f;
 
@@ -330,6 +332,10 @@ namespace VRMHelper
                         var defaultOffset = cmp.Colliders[0].Offset;
                         var scaler = defaultRadius / refDefaultRadius; // リファレンス値に対するサイズ比
                         // TODO: 顔の縦横比等を考慮
+
+                        // 調整後の球
+                        var centerRadius = refCenterRadius * scaler;
+                        var centerOffset = defaultOffset + (refCenterOffset - refDefaultOffset) * scaler;
 
                         // 鼻寄り中央に追加する球
                         var noseRadius = refNoseRadius * scaler;
@@ -345,7 +351,7 @@ namespace VRMHelper
                         var cheekOffsetR = new Vector3(-cheekOffsetL.x, cheekOffsetL.y, cheekOffsetL.z);
 
                         cmp.Colliders = new VRMSpringBoneColliderGroup.SphereCollider[5]{
-                            cmp.Colliders[0],
+                            new VRMSpringBoneColliderGroup.SphereCollider{ Radius = centerRadius, Offset = centerOffset },
                             new VRMSpringBoneColliderGroup.SphereCollider{ Radius = noseRadius, Offset = noseOffset },
                             new VRMSpringBoneColliderGroup.SphereCollider{ Radius = foreheadRadius, Offset = foreheadOffset },
                             new VRMSpringBoneColliderGroup.SphereCollider{ Radius = cheekRadius, Offset = cheekOffsetL },
