@@ -1,6 +1,11 @@
 # VRMHelper
 
-Unity 2019.2.17f にて動作確認を行っております。
+以下の環境にて動作確認を行っております。
+
+- Windows 10 64bit
+- Unity 2019.2.17f
+- VRoid Studio 0.8.1
+- UniVRM v0.55.0
 
 詳細は [こちらの記事](https://qiita.com/but80/items/3cc28cd874764daf3e58) をお読みください。
 

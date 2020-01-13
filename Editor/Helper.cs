@@ -53,7 +53,7 @@ namespace VRMHelper
         /// <typeparam name="T">検索対象コンポーネントの型</typeparam>
         internal static T[] FindAllComponents<T>()
         {
-            var objs = Resources.FindObjectsOfTypeAll(typeof(GameObject)) as GameObject[];
+            var objs = Resources.FindObjectsOfTypeAll<GameObject>();
             return GetAllComponents<T>(objs);
         }
 
@@ -63,7 +63,7 @@ namespace VRMHelper
         /// <typeparam name="T">検索対象コンポーネントの型</typeparam>
         internal static T[] FindAllComponentsInSelected<T>()
         {
-            var objs = Selection.GetFiltered(typeof(GameObject), SelectionMode.Deep);
+            var objs = Selection.GetFiltered<GameObject>(SelectionMode.Deep);
             return GetAllComponents<T>(objs);
         }
 
@@ -74,7 +74,7 @@ namespace VRMHelper
         {
             var inHierarchy = false;
             var inProject = false;
-            foreach (GameObject obj in Selection.GetFiltered(typeof(GameObject), SelectionMode.TopLevel))
+            foreach (var obj in Selection.GetFiltered<GameObject>(SelectionMode.TopLevel))
             {
                 if (obj.GetComponents<VRMMeta>().Length == 0) continue;
                 if (AssetDatabase.Contains(obj))
