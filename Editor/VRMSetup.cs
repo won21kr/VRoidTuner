@@ -230,6 +230,7 @@ namespace VRMHelper
                 foreach (var cmp in Helper.FindAllComponentsInSelected<VRMLookAtHead>())
                 {
                     cmp.UpdateType = UpdateType.LateUpdate;
+                    EditorUtility.SetDirty(cmp);
                 }
             }
 
@@ -278,6 +279,9 @@ namespace VRMHelper
                         if (mat.name.Contains("EyeHighlight")) mat.shader = vrmUnlitTransparentShader;
                     }
                 }
+
+                EditorUtility.SetDirty(cmp);
+                EditorUtility.SetDirty(obj);
             }
         }
 
@@ -299,6 +303,8 @@ namespace VRMHelper
                     ser.FindProperty("m_gizmoColor").colorValue = Helper.GizmoColor();
                     ser.ApplyModifiedProperties();
                 }
+                EditorUtility.SetDirty(cmp);
+                EditorUtility.SetDirty(cmp.gameObject);
             }
 
             // 「長い前髪が顔に埋まる」対策
@@ -353,6 +359,8 @@ namespace VRMHelper
                             new VRMSpringBoneColliderGroup.SphereCollider{ Radius = cheekRadius, Offset = cheekOffsetL },
                             new VRMSpringBoneColliderGroup.SphereCollider{ Radius = cheekRadius, Offset = cheekOffsetR },
                         };
+                        EditorUtility.SetDirty(cmp);
+                        EditorUtility.SetDirty(cmp.gameObject);
                     }
                 }
             }
