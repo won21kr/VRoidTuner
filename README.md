@@ -26,11 +26,11 @@ git submodule add https://github.com/(your-name)/VRMHelper.git
 
 パッケージをインポートすると、以下のメニュー項目が追加されます。`Open Setup Window` で設定ウィンドウを表示してください。
 
-![](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/34010/752673f1-f88e-8048-0798-2d160fb1607c.png)
+![](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/34010/ef61e092-6a9d-d0a4-886e-d8d3f4780775.png)
 
 プロジェクトアセット中のVRMモデルプレハブを選択状態にし、各項目を設定して「適用」をクリックしてください。
 
-![](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/34010/b5cf4e4b-9329-10bc-3ce4-8222c27fc398.png)
+![](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/34010/0c9b469e-603b-3892-8afa-585887d30605.png)
 
 ## 注意点
 
