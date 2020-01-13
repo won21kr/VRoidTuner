@@ -50,9 +50,9 @@ namespace VRMHelper
         /// <summary>
         /// 編集を終了するため、オブジェクトの表示状態を通常の状態に戻します。
         /// </summary>
-        private static void RevertVisibility()
+        private static void RevertVisibility(GameObject root = null)
         {
-            var root = GetPrefabRootVRM();
+            if (root == null) root = GetPrefabRootVRM();
             if (root == null) return;
 
             // 隠してあったメッシュを再表示
@@ -82,21 +82,18 @@ namespace VRMHelper
 
         private static bool IsInitialized = false;
 
+        private static void onPrefabStageOpenedOrClosing(PrefabStage stage)
+        {
+            var root = stage.prefabContentsRoot;
+            if (root.GetComponent<VRMMeta>() == null) return;
+            RevertVisibility(root);
+        }
+
         private static void Init()
         {
             if (IsInitialized) return;
-            PrefabStage.prefabStageClosing += (PrefabStage stage) =>
-            {
-                Debug.Log("prefab stage closing: " + stage.prefabAssetPath);
-            };
-            PrefabStage.prefabSaving += (GameObject obj) =>
-            {
-                Debug.Log("prefab saving: " + obj.name);
-            };
-            PrefabStage.prefabSaved += (GameObject obj) =>
-            {
-                Debug.Log("prefab saved: " + obj.name);
-            };
+            PrefabStage.prefabStageClosing += onPrefabStageOpenedOrClosing;
+            PrefabStage.prefabStageOpened += onPrefabStageOpenedOrClosing;
             IsInitialized = true;
         }
 

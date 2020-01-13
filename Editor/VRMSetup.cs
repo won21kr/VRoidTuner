@@ -3,6 +3,7 @@ using System.IO;
 using UnityEngine;
 using UnityEditor;
 using VRM;
+using System.Collections.Generic;
 
 namespace VRMHelper
 {
@@ -58,11 +59,19 @@ namespace VRMHelper
             internal bool AddHeadColliders = true;
             internal bool ShuffleSpringBoneGizmoColors = true;
 
+            [SerializeField, Range(-3600, 3600)] private float _HairJointTwistAngle = 90f;
+            public float HairJointTwistAngle
+            {
+                get { return _HairJointTwistAngle; }
+                set { _HairJointTwistAngle = Mathf.Clamp(value, -3600, 3600); }
+            }
+
         }
 
         private VRMSetupParams _params;
-        private bool _selectedInHierarchy;
-        private bool _selectedInProject;
+        private bool _vrmSelectedInHierarchy;
+        private bool _vrmSelectedInProject;
+        private bool _hairJointSelected;
 
         [MenuItem("VRM/VRM Helper/Open Setup Window")]
         private static void Create()
@@ -79,21 +88,27 @@ namespace VRMHelper
 
         private void selectionUpdated()
         {
-            (_selectedInHierarchy, _selectedInProject) = Helper.IsVRMSelected();
+            (_vrmSelectedInHierarchy, _vrmSelectedInProject) = Helper.IsVRMSelected();
+
+            _hairJointSelected = false;
+            foreach (var obj in Selection.GetFiltered<GameObject>(SelectionMode.TopLevel))
+            {
+                if (obj.name.StartsWith("HairJoint-")) _hairJointSelected = true;
+            }
+
             Repaint();
         }
 
+        private bool _isSetupSectionOpen = true;
+        private bool _isTwistHairSectionOpen = true;
+
         private void OnGUI()
         {
+            selectionUpdated();
+
             if (_params == null)
             {
                 _params = VRMSetupParams.CreateInstance<VRMSetupParams>();
-
-                // Selection.selectionChanged += () =>
-                // {
-                //     (_selectedInHierarchy, _selectedInProject) = Helper.IsVRMSelected();
-                //     Repaint();
-                // };
             }
 
             GUIStyle caption = new GUIStyle()
@@ -101,123 +116,172 @@ namespace VRMHelper
                 alignment = TextAnchor.MiddleLeft,
                 fontStyle = FontStyle.Bold,
             };
+
+            GUIStyle foldout = new GUIStyle(EditorStyles.foldout);
+            foldout.fontStyle = FontStyle.Bold;
+
             var originalLabelWidth = EditorGUIUtility.labelWidth;
             GUI.enabled = true;
 
-            if (!(_selectedInHierarchy || _selectedInProject))
+            if (_isSetupSectionOpen = EditorGUILayout.Foldout(_isSetupSectionOpen, "セットアップ", foldout))
             {
-                EditorGUILayout.HelpBox("プロジェクトアセットまたはヒエラルキー内のVRMモデルプレハブを選択してください。", MessageType.Error);
+                EditorGUI.indentLevel++;
+
+                if (!(_vrmSelectedInHierarchy || _vrmSelectedInProject))
+                {
+                    EditorGUILayout.HelpBox("プロジェクトアセットまたはヒエラルキー内のVRMモデルプレハブを選択してください。", MessageType.Error);
+                }
+
+                using (new GUILayout.VerticalScope())
+                {
+                    GUI.enabled = _vrmSelectedInHierarchy || _vrmSelectedInProject;
+                    EditorGUILayout.LabelField("「顔のメッシュが消える」対策", caption);
+                    EditorGUIUtility.labelWidth = 270;
+                    EditorGUI.indentLevel++;
+                    _params.UpdateWhenOffscreen = EditorGUILayout.Toggle("全メッシュの UpdateWhenOffscreen を On", _params.UpdateWhenOffscreen);
+                    EditorGUI.indentLevel--;
+                }
+
+                using (new GUILayout.VerticalScope())
+                {
+                    GUI.enabled = _vrmSelectedInHierarchy;
+                    EditorGUILayout.LabelField("「VRで一人称視点にすると顔の裏面で視界が埋まる」対策", caption);
+                    EditorGUIUtility.labelWidth = 270;
+                    EditorGUI.indentLevel++;
+                    _params.UseFirstPersonOnlyLayer = EditorGUILayout.Toggle("FIRSTPERSON_ONLY_LAYER レイヤに設定", _params.UseFirstPersonOnlyLayer);
+                    EditorGUILayout.HelpBox(
+                        "Face・Hair メッシュを FIRSTPERSON_ONLY_LAYER レイヤに設定します（定義されている場合のみ）。",
+                        MessageType.Info);
+                    if (_vrmSelectedInProject) EditorGUILayout.HelpBox(
+                        "ヒエラルキー中のオブジェクトにのみ適用されます。プロジェクトアセット中のプレハブに対する変更は保存されません。",
+                        MessageType.Warning);
+                    EditorGUI.indentLevel--;
+                }
+
+                using (new GUILayout.VerticalScope())
+                {
+                    GUI.enabled = _vrmSelectedInHierarchy || _vrmSelectedInProject;
+                    EditorGUILayout.LabelField("「顔に影が落ちてうっとうしい」対策", caption);
+                    EditorGUIUtility.labelWidth = 270;
+                    EditorGUI.indentLevel++;
+                    _params.TurnOffReceivesShadowsOnFace = EditorGUILayout.Toggle("Face の ReceivesShadows を Off", _params.TurnOffReceivesShadowsOnFace);
+                    _params.TurnOffReceivesShadowsOnHair = EditorGUILayout.Toggle("Hair の ReceivesShadows を Off", _params.TurnOffReceivesShadowsOnHair);
+                    _params.TurnOffReceivesShadowsOnBody = EditorGUILayout.Toggle("Body の ReceivesShadows を Off", _params.TurnOffReceivesShadowsOnBody);
+                    EditorGUI.indentLevel--;
+                }
+
+                using (new GUILayout.VerticalScope())
+                {
+                    GUI.enabled = _vrmSelectedInHierarchy || _vrmSelectedInProject;
+                    EditorGUILayout.LabelField("「目のハイライトが暗い」対策", caption);
+                    EditorGUIUtility.labelWidth = 270;
+                    EditorGUI.indentLevel++;
+                    _params.MakeEyeHighlightUnlit = EditorGUILayout.Toggle("ハイライトのシェーダを Unlit に変更", _params.MakeEyeHighlightUnlit);
+                    EditorGUILayout.HelpBox(
+                        "名前に \"EyeHighlight\" が含まれるマテリアルのシェーダを \"VRM/UnlitTransparent\" に変更します。",
+                        MessageType.Info);
+                    if (_vrmSelectedInHierarchy) EditorGUILayout.HelpBox(
+                        "プロジェクトアセット中のパラメータが変更されるため、この設定はプロジェクトを通じて共有されます。",
+                        MessageType.Warning);
+                    EditorGUI.indentLevel--;
+                }
+
+                using (new GUILayout.VerticalScope())
+                {
+                    GUI.enabled = _vrmSelectedInHierarchy || _vrmSelectedInProject;
+                    EditorGUILayout.LabelField("「カメラの方を見てくれない」対策", caption);
+                    EditorGUIUtility.labelWidth = 270;
+                    EditorGUI.indentLevel++;
+                    _params.DoVRMLookAtHeadAtLateUpdate = EditorGUILayout.Toggle("VRMLookAtHead を LateUpdate で行う", _params.DoVRMLookAtHeadAtLateUpdate);
+                    EditorGUI.indentLevel--;
+                }
+
+                using (new GUILayout.VerticalScope())
+                {
+                    GUI.enabled = _vrmSelectedInHierarchy || _vrmSelectedInProject;
+                    EditorGUILayout.LabelField("「揺れものが思い通りに揺れない」対策", caption);
+                    EditorGUIUtility.labelWidth = 270;
+                    EditorGUI.indentLevel++;
+                    _params.OverwriteDragForce = EditorGUILayout.Toggle("DragForce（抵抗力）を変更", _params.OverwriteDragForce);
+                    _params.DragForceOffset = EditorGUILayout.FloatField("        基準値", _params.DragForceOffset);
+                    _params.GravityPowerToDragForceRatio = EditorGUILayout.FloatField("        + GravityPower ×", _params.GravityPowerToDragForceRatio);
+                    _params.OverwriteStiffnessForce = EditorGUILayout.Toggle("StiffnessForce（復元力）を変更 ※非推奨", _params.OverwriteStiffnessForce);
+                    _params.StiffnessForceOffset = EditorGUILayout.FloatField("        基準値", _params.StiffnessForceOffset);
+                    _params.GravityPowerToStiffnessForceRatio = EditorGUILayout.FloatField("        + GravityPower ×", _params.GravityPowerToStiffnessForceRatio);
+                    EditorGUILayout.HelpBox(
+                        "髪と思しき（comment が空文字の）全 VRMSpringBone を対象にパラメータを上書き変更します。",
+                        MessageType.Info);
+                    if (_vrmSelectedInHierarchy) EditorGUILayout.HelpBox(
+                        "ヒエラルキー中のオブジェクトに対する変更は、開始時に破棄される場合があります。これを避けるには、プレハブに上書き保存してください。",
+                        MessageType.Warning);
+                    EditorGUI.indentLevel--;
+                }
+
+                using (new GUILayout.VerticalScope())
+                {
+                    GUI.enabled = _vrmSelectedInHierarchy || _vrmSelectedInProject;
+                    EditorGUILayout.LabelField("「長い前髪が顔に埋まる」対策", caption);
+                    EditorGUIUtility.labelWidth = 270;
+                    EditorGUI.indentLevel++;
+                    _params.AddHeadColliders = EditorGUILayout.Toggle("J_Bip_C_Head にコライダーを追加", _params.AddHeadColliders);
+                    EditorGUILayout.HelpBox(
+                        "J_Bip_C_Head の VRM Spring Bone Collider Group にコライダーを追加します。\n" +
+                        "2つ以上のコライダーが既に設定されている場合は何も変更しません。",
+                        MessageType.Info);
+                    if (_vrmSelectedInHierarchy) EditorGUILayout.HelpBox(
+                        "ヒエラルキー中のオブジェクトに対する変更は、開始時に破棄される場合があります。これを避けるには、プレハブに上書き保存してください。",
+                        MessageType.Warning);
+                    EditorGUI.indentLevel--;
+                }
+
+                using (new GUILayout.VerticalScope())
+                {
+                    GUI.enabled = _vrmSelectedInHierarchy || _vrmSelectedInProject;
+                    EditorGUILayout.LabelField("その他", caption);
+                    EditorGUIUtility.labelWidth = 270;
+                    EditorGUI.indentLevel++;
+                    _params.ShuffleSpringBoneGizmoColors = EditorGUILayout.Toggle("VRMSpringBone のギズモ色をシャッフル", _params.ShuffleSpringBoneGizmoColors);
+                    if (_vrmSelectedInHierarchy) EditorGUILayout.HelpBox(
+                        "プロジェクトアセット中のパラメータが変更されるため、この設定はプロジェクトを通じて共有されます。",
+                        MessageType.Warning);
+                    EditorGUI.indentLevel--;
+                }
+
+                using (new GUILayout.HorizontalScope())
+                {
+                    GUI.enabled = _vrmSelectedInHierarchy || _vrmSelectedInProject;
+                    if (GUILayout.Button("適用")) ApplyOptimization();
+                }
+
+                EditorGUILayout.LabelField("");
+                EditorGUI.indentLevel--;
             }
 
-            using (new GUILayout.VerticalScope(GUI.skin.box))
+            GUI.enabled = true;
+            if (_isTwistHairSectionOpen = EditorGUILayout.Foldout(_isTwistHairSectionOpen, "髪束をひねる", foldout))
             {
-                GUI.enabled = _selectedInHierarchy || _selectedInProject;
-                EditorGUILayout.LabelField("「顔のメッシュが消える」対策", caption);
-                EditorGUIUtility.labelWidth = 250;
-                _params.UpdateWhenOffscreen = EditorGUILayout.Toggle("全メッシュの UpdateWhenOffscreen を On", _params.UpdateWhenOffscreen);
-            }
+                EditorGUI.indentLevel++;
 
-            using (new GUILayout.VerticalScope(GUI.skin.box))
-            {
-                GUI.enabled = _selectedInHierarchy;
-                EditorGUILayout.LabelField("「VRで一人称視点にすると顔の裏面で視界が埋まる」対策", caption);
-                EditorGUIUtility.labelWidth = 250;
-                _params.UseFirstPersonOnlyLayer = EditorGUILayout.Toggle("FIRSTPERSON_ONLY_LAYER レイヤに設定", _params.UseFirstPersonOnlyLayer);
-                EditorGUILayout.HelpBox(
-                    "Face・Hair メッシュを FIRSTPERSON_ONLY_LAYER レイヤに設定します（定義されている場合のみ）。",
-                    MessageType.Info);
-                if (_selectedInProject) EditorGUILayout.HelpBox(
-                    "ヒエラルキー中のオブジェクトにのみ適用されます。プロジェクトアセット中のプレハブに対する変更は保存されません。",
-                    MessageType.Warning);
-            }
+                if (!_hairJointSelected)
+                {
+                    EditorGUILayout.HelpBox("ヒエラルキー内の髪ボーン（HairJoint-*）を選択してください。", MessageType.Error);
+                }
 
-            using (new GUILayout.VerticalScope(GUI.skin.box))
-            {
-                GUI.enabled = _selectedInHierarchy || _selectedInProject;
-                EditorGUILayout.LabelField("「顔に影が落ちてうっとうしい」対策", caption);
-                EditorGUIUtility.labelWidth = 250;
-                _params.TurnOffReceivesShadowsOnFace = EditorGUILayout.Toggle("Face の ReceivesShadows を Off", _params.TurnOffReceivesShadowsOnFace);
-                _params.TurnOffReceivesShadowsOnHair = EditorGUILayout.Toggle("Hair の ReceivesShadows を Off", _params.TurnOffReceivesShadowsOnHair);
-                _params.TurnOffReceivesShadowsOnBody = EditorGUILayout.Toggle("Body の ReceivesShadows を Off", _params.TurnOffReceivesShadowsOnBody);
-            }
+                GUI.enabled = _hairJointSelected;
+                EditorGUIUtility.labelWidth = 270;
+                _params.HairJointTwistAngle = EditorGUILayout.FloatField("角度", _params.HairJointTwistAngle);
 
-            using (new GUILayout.VerticalScope(GUI.skin.box))
-            {
-                GUI.enabled = _selectedInHierarchy || _selectedInProject;
-                EditorGUILayout.LabelField("「目のハイライトが暗い」対策", caption);
-                EditorGUIUtility.labelWidth = 250;
-                _params.MakeEyeHighlightUnlit = EditorGUILayout.Toggle("ハイライトのシェーダを Unlit に変更", _params.MakeEyeHighlightUnlit);
-                EditorGUILayout.HelpBox(
-                    "名前に \"EyeHighlight\" が含まれるマテリアルのシェーダを \"VRM/UnlitTransparent\" に変更します。",
-                    MessageType.Info);
-                if (_selectedInHierarchy) EditorGUILayout.HelpBox(
-                    "プロジェクトアセット中のパラメータが変更されるため、この設定はプロジェクトを通じて共有されます。",
-                    MessageType.Warning);
-            }
+                using (new GUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("適用")) TwistHairJoint();
+                }
 
-            using (new GUILayout.VerticalScope(GUI.skin.box))
-            {
-                GUI.enabled = _selectedInHierarchy || _selectedInProject;
-                EditorGUILayout.LabelField("「カメラの方を見てくれない」対策", caption);
-                EditorGUIUtility.labelWidth = 250;
-                _params.DoVRMLookAtHeadAtLateUpdate = EditorGUILayout.Toggle("VRMLookAtHead を LateUpdate で行う", _params.DoVRMLookAtHeadAtLateUpdate);
-            }
-
-            using (new GUILayout.VerticalScope(GUI.skin.box))
-            {
-                GUI.enabled = _selectedInHierarchy || _selectedInProject;
-                EditorGUILayout.LabelField("「揺れものが思い通りに揺れない」対策", caption);
-                _params.OverwriteDragForce = EditorGUILayout.Toggle("DragForce（抵抗力）を変更", _params.OverwriteDragForce);
-                _params.DragForceOffset = EditorGUILayout.FloatField("        基準値", _params.DragForceOffset);
-                _params.GravityPowerToDragForceRatio = EditorGUILayout.FloatField("        + GravityPower ×", _params.GravityPowerToDragForceRatio);
-                _params.OverwriteStiffnessForce = EditorGUILayout.Toggle("StiffnessForce（復元力）を変更 ※非推奨", _params.OverwriteStiffnessForce);
-                _params.StiffnessForceOffset = EditorGUILayout.FloatField("        基準値", _params.StiffnessForceOffset);
-                _params.GravityPowerToStiffnessForceRatio = EditorGUILayout.FloatField("        + GravityPower ×", _params.GravityPowerToStiffnessForceRatio);
-                EditorGUILayout.HelpBox(
-                    "髪と思しき（comment が空文字の）全 VRMSpringBone を対象にパラメータを上書き変更します。",
-                    MessageType.Info);
-                if (_selectedInHierarchy) EditorGUILayout.HelpBox(
-                    "ヒエラルキー中のオブジェクトに対する変更は、開始時に破棄される場合があります。これを避けるには、プレハブに上書き保存してください。",
-                    MessageType.Warning);
-            }
-
-            using (new GUILayout.VerticalScope(GUI.skin.box))
-            {
-                GUI.enabled = _selectedInHierarchy || _selectedInProject;
-                EditorGUILayout.LabelField("「長い前髪が顔に埋まる」対策", caption);
-                EditorGUIUtility.labelWidth = 250;
-                _params.AddHeadColliders = EditorGUILayout.Toggle("J_Bip_C_Head にコライダーを追加", _params.AddHeadColliders);
-                EditorGUILayout.HelpBox(
-                    "J_Bip_C_Head の VRM Spring Bone Collider Group にコライダーを追加します。\n" +
-                    "2つ以上のコライダーが既に設定されている場合は何も変更しません。",
-                    MessageType.Info);
-                if (_selectedInHierarchy) EditorGUILayout.HelpBox(
-                    "ヒエラルキー中のオブジェクトに対する変更は、開始時に破棄される場合があります。これを避けるには、プレハブに上書き保存してください。",
-                    MessageType.Warning);
-            }
-
-            using (new GUILayout.VerticalScope(GUI.skin.box))
-            {
-                GUI.enabled = _selectedInHierarchy || _selectedInProject;
-                EditorGUILayout.LabelField("その他", caption);
-                EditorGUIUtility.labelWidth = 250;
-                _params.ShuffleSpringBoneGizmoColors = EditorGUILayout.Toggle("VRMSpringBone のギズモ色をシャッフル", _params.ShuffleSpringBoneGizmoColors);
-                if (_selectedInHierarchy) EditorGUILayout.HelpBox(
-                    "プロジェクトアセット中のパラメータが変更されるため、この設定はプロジェクトを通じて共有されます。",
-                    MessageType.Warning);
+                EditorGUILayout.LabelField("");
+                EditorGUI.indentLevel--;
             }
 
             EditorGUIUtility.labelWidth = originalLabelWidth;
             GUI.enabled = true;
-
-            using (new GUILayout.HorizontalScope())
-            {
-                GUI.enabled = _selectedInHierarchy || _selectedInProject;
-                if (GUILayout.Button("適用"))
-                {
-                    ApplyOptimization();
-                }
-            }
         }
 
         private void ApplyOptimization()
@@ -246,7 +310,7 @@ namespace VRMHelper
 
         private void ApplyMeshOptimization()
         {
-            var firstpersonOnlyLayer = LayerMask.NameToLayer("FIRSTPERSON_ONLY_LAYER");
+            var firstpersonOnlyLayer = LayerMask.NameToLayer("FIRSTPERSON_ONLY_LAYER"); // == 9
             var vrmUnlitTransparentShader = Shader.Find("VRM/UnlitTransparent");
 
             var cmps = Helper.FindAllComponentsInSelected<SkinnedMeshRenderer>();
@@ -318,8 +382,6 @@ namespace VRMHelper
                         // 制作者環境でのリファレンス値
                         var refDefaultOffset = new Vector3(0f, 0.09858859f, -0.01234177f); // VRoid Studio が出力した球
                         float refDefaultRadius = 0.09824938f;
-                        var refCenterOffset = new Vector3(0f, 0.1222353f, -0.01234177f); // VRoid Studio が出力した球の調整
-                        float refCenterRadius = 0.09824938f;
                         var refNoseOffset = new Vector3(0f, 0.0752f, 0.0155f); // 鼻寄り中央に追加した球
                         float refNoseRadius = 0.156f / 2;
                         var refForeheadOffset = new Vector3(0.0101f, 0.1073f, 0.0133f); // +X側の額寄りに追加した球
@@ -332,10 +394,6 @@ namespace VRMHelper
                         var defaultOffset = cmp.Colliders[0].Offset;
                         var scaler = defaultRadius / refDefaultRadius; // リファレンス値に対するサイズ比
                         // TODO: 顔の縦横比等を考慮
-
-                        // 調整後の球
-                        var centerRadius = refCenterRadius * scaler;
-                        var centerOffset = defaultOffset + (refCenterOffset - refDefaultOffset) * scaler;
 
                         // 鼻寄り中央に追加する球
                         var noseRadius = refNoseRadius * scaler;
@@ -352,7 +410,7 @@ namespace VRMHelper
                         var cheekOffsetR = new Vector3(-cheekOffsetL.x, cheekOffsetL.y, cheekOffsetL.z);
 
                         cmp.Colliders = new VRMSpringBoneColliderGroup.SphereCollider[6]{
-                            new VRMSpringBoneColliderGroup.SphereCollider{ Radius = centerRadius, Offset = centerOffset },
+                            cmp.Colliders[0],
                             new VRMSpringBoneColliderGroup.SphereCollider{ Radius = noseRadius, Offset = noseOffset },
                             new VRMSpringBoneColliderGroup.SphereCollider{ Radius = foreheadRadius, Offset = foreheadOffsetL },
                             new VRMSpringBoneColliderGroup.SphereCollider{ Radius = foreheadRadius, Offset = foreheadOffsetR },
@@ -362,6 +420,41 @@ namespace VRMHelper
                         EditorUtility.SetDirty(cmp);
                         EditorUtility.SetDirty(cmp.gameObject);
                     }
+                }
+            }
+        }
+
+        private Transform GetFirstChild(Transform t)
+        {
+            foreach (var u in t.GetComponentsInChildren<Transform>())
+            {
+                if (u.parent == t) return u;
+            }
+            return null;
+        }
+
+        private void TwistHairJoint()
+        {
+            foreach (var root in Selection.GetFiltered<Transform>(SelectionMode.TopLevel))
+            {
+                if (!root.name.StartsWith("HairJoint-")) continue;
+
+                // 子孫オブジェクトを先端まで取得
+                var cmps = new List<Transform>();
+                for (var cmp = root; cmp != null; cmp = GetFirstChild(cmp))
+                {
+                    cmps.Add(cmp);
+                }
+
+                var step = _params.HairJointTwistAngle / cmps.Count;
+                var angle = 0f;
+                foreach (var cmp in cmps)
+                {
+                    angle += step;
+                    var a = cmp.eulerAngles;
+                    a.y = angle;
+                    cmp.eulerAngles = a;
+                    EditorUtility.SetDirty(cmp);
                 }
             }
         }
