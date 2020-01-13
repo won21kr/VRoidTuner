@@ -2,14 +2,36 @@ using UnityEngine;
 using UnityEditor;
 using VRM;
 using System.Linq;
-using System.Collections;
-using System.Collections.Generic;
 
 namespace VRMHelper
 {
 
     internal class Helper
     {
+
+        private static Color[] GizmoColors = new Color[]{
+            new Color(0.0f, 0.0f, 0.0f, 1.0f),
+            new Color(1.0f, 0.0f, 0.0f, 1.0f),
+            new Color(1.0f, 0.5f, 0.0f, 1.0f),
+            new Color(1.0f, 1.0f, 0.0f, 1.0f),
+            new Color(0.5f, 1.0f, 0.0f, 1.0f),
+            new Color(0.0f, 1.0f, 0.0f, 1.0f),
+            new Color(0.0f, 1.0f, 0.5f, 1.0f),
+            new Color(0.0f, 1.0f, 1.0f, 1.0f),
+            new Color(0.0f, 0.5f, 1.0f, 1.0f),
+            new Color(0.0f, 0.0f, 1.0f, 1.0f),
+            new Color(0.5f, 0.0f, 1.0f, 1.0f),
+            new Color(1.0f, 0.0f, 1.0f, 1.0f),
+            new Color(1.0f, 0.0f, 0.5f, 1.0f),
+            new Color(0.5f, 0.5f, 0.5f, 1.0f),
+            new Color(1.0f, 1.0f, 1.0f, 1.0f),
+        };
+
+        internal static Color GizmoColor(int i = -1)
+        {
+            if (i < 0) i = UnityEngine.Random.Range(0, GizmoColors.Length);
+            return GizmoColors[i % GizmoColors.Length];
+        }
 
         /// <summary>
         /// 指定オブジェクト群にアタッチされているコンポーネントをすべて取得します。

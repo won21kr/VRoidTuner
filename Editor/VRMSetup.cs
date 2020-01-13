@@ -60,24 +60,6 @@ namespace VRMHelper
 
         }
 
-        private static Color[] _gizmoColors = new Color[]{
-            new Color(0.0f, 0.0f, 0.0f, 1.0f),
-            new Color(1.0f, 0.0f, 0.0f, 1.0f),
-            new Color(1.0f, 0.5f, 0.0f, 1.0f),
-            new Color(1.0f, 1.0f, 0.0f, 1.0f),
-            new Color(0.5f, 1.0f, 0.0f, 1.0f),
-            new Color(0.0f, 1.0f, 0.0f, 1.0f),
-            new Color(0.0f, 1.0f, 0.5f, 1.0f),
-            new Color(0.0f, 1.0f, 1.0f, 1.0f),
-            new Color(0.0f, 0.5f, 1.0f, 1.0f),
-            new Color(0.0f, 0.0f, 1.0f, 1.0f),
-            new Color(0.5f, 0.0f, 1.0f, 1.0f),
-            new Color(1.0f, 0.0f, 1.0f, 1.0f),
-            new Color(1.0f, 0.0f, 0.5f, 1.0f),
-            new Color(0.5f, 0.5f, 0.5f, 1.0f),
-            new Color(1.0f, 1.0f, 1.0f, 1.0f),
-        };
-
         private VRMSetupParams _params;
         private bool _selectedInHierarchy;
         private bool _selectedInProject;
@@ -87,6 +69,18 @@ namespace VRMHelper
         {
             var window = GetWindow<VRMSetup>("VRM Setup");
             window.minSize = new Vector2(320, 320);
+            window.selectionUpdated();
+        }
+
+        private void OnSelectionChange()
+        {
+            selectionUpdated();
+        }
+
+        private void selectionUpdated()
+        {
+            (_selectedInHierarchy, _selectedInProject) = Helper.IsVRMSelected();
+            Repaint();
         }
 
         private void OnGUI()
@@ -95,11 +89,11 @@ namespace VRMHelper
             {
                 _params = VRMSetupParams.CreateInstance<VRMSetupParams>();
 
-                Selection.selectionChanged += () =>
-                {
-                    (_selectedInHierarchy, _selectedInProject) = Helper.IsVRMSelected();
-                    Repaint();
-                };
+                // Selection.selectionChanged += () =>
+                // {
+                //     (_selectedInHierarchy, _selectedInProject) = Helper.IsVRMSelected();
+                //     Repaint();
+                // };
             }
 
             GUIStyle caption = new GUIStyle()
@@ -171,7 +165,7 @@ namespace VRMHelper
 
             using (new GUILayout.VerticalScope(GUI.skin.box))
             {
-                GUI.enabled = _selectedInProject;
+                GUI.enabled = _selectedInHierarchy || _selectedInProject;
                 EditorGUILayout.LabelField("「揺れものが思い通りに揺れない」対策", caption);
                 _params.OverwriteDragForce = EditorGUILayout.Toggle("DragForce（抵抗力）を変更", _params.OverwriteDragForce);
                 _params.DragForceOffset = EditorGUILayout.FloatField("        基準値", _params.DragForceOffset);
@@ -183,13 +177,13 @@ namespace VRMHelper
                     "髪と思しき（comment が空文字の）全 VRMSpringBone を対象にパラメータを上書き変更します。",
                     MessageType.Info);
                 if (_selectedInHierarchy) EditorGUILayout.HelpBox(
-                    "プロジェクトアセット中のプレハブにのみ適用されます。ヒエラルキー中のオブジェクトに対する変更は、開始時に破棄される場合があります。",
+                    "ヒエラルキー中のオブジェクトに対する変更は、開始時に破棄される場合があります。これを避けるには、プレハブに上書き保存してください。",
                     MessageType.Warning);
             }
 
             using (new GUILayout.VerticalScope(GUI.skin.box))
             {
-                GUI.enabled = _selectedInProject;
+                GUI.enabled = _selectedInHierarchy || _selectedInProject;
                 EditorGUILayout.LabelField("「長い前髪が顔に埋まる」対策", caption);
                 EditorGUIUtility.labelWidth = 250;
                 _params.AddHeadColliders = EditorGUILayout.Toggle("J_Bip_C_Head にコライダーを追加", _params.AddHeadColliders);
@@ -198,7 +192,7 @@ namespace VRMHelper
                     "2つ以上のコライダーが既に設定されている場合は何も変更しません。",
                     MessageType.Info);
                 if (_selectedInHierarchy) EditorGUILayout.HelpBox(
-                    "プロジェクトアセット中のプレハブにのみ適用されます。ヒエラルキー中のオブジェクトに対する変更は、開始時に破棄される場合があります。",
+                    "ヒエラルキー中のオブジェクトに対する変更は、開始時に破棄される場合があります。これを避けるには、プレハブに上書き保存してください。",
                     MessageType.Warning);
             }
 
@@ -302,7 +296,7 @@ namespace VRMHelper
                 {
                     var ser = new SerializedObject(cmp);
                     ser.Update();
-                    ser.FindProperty("m_gizmoColor").colorValue = _gizmoColors[UnityEngine.Random.Range(0, _gizmoColors.Length)];
+                    ser.FindProperty("m_gizmoColor").colorValue = Helper.GizmoColor();
                     ser.ApplyModifiedProperties();
                 }
             }
@@ -320,10 +314,10 @@ namespace VRMHelper
                         float refDefaultRadius = 0.09824938f;
                         var refCenterOffset = new Vector3(0f, 0.1222353f, -0.01234177f); // VRoid Studio が出力した球の調整
                         float refCenterRadius = 0.09824938f;
-                        var refNoseOffset = new Vector3(0f, 0.05687952f, 0.01470231f); // 鼻寄り中央に追加した球
-                        float refNoseRadius = 0.078f;
-                        var refForeheadOffset = new Vector3(0f, 0.11f, 0.008f); // 額寄り中央に追加した球
-                        float refForeheadRadius = 0.093f;
+                        var refNoseOffset = new Vector3(0f, 0.0752f, 0.0155f); // 鼻寄り中央に追加した球
+                        float refNoseRadius = 0.156f / 2;
+                        var refForeheadOffset = new Vector3(0.0101f, 0.1073f, 0.0133f); // +X側の額寄りに追加した球
+                        float refForeheadRadius = 0.15887f / 2;
                         var refCheekOffset = new Vector3(0.02053911f, 0.0374347f, 0.04125598f); // +X側の頬寄りに追加した球
                         float refCheekRadius = 0.054f;
 
@@ -341,19 +335,21 @@ namespace VRMHelper
                         var noseRadius = refNoseRadius * scaler;
                         var noseOffset = defaultOffset + (refNoseOffset - refDefaultOffset) * scaler;
 
-                        // 額寄り中央に追加する球
+                        // 左右の額寄りに追加する球
                         var foreheadRadius = refForeheadRadius * scaler;
-                        var foreheadOffset = defaultOffset + (refForeheadOffset - refDefaultOffset) * scaler;
+                        var foreheadOffsetL = defaultOffset + (refForeheadOffset - refDefaultOffset) * scaler;
+                        var foreheadOffsetR = new Vector3(-foreheadOffsetL.x, foreheadOffsetL.y, foreheadOffsetL.z);
 
                         // 左右の頬寄りに追加する球
                         var cheekRadius = refCheekRadius * scaler;
                         var cheekOffsetL = defaultOffset + (refCheekOffset - refDefaultOffset) * scaler;
                         var cheekOffsetR = new Vector3(-cheekOffsetL.x, cheekOffsetL.y, cheekOffsetL.z);
 
-                        cmp.Colliders = new VRMSpringBoneColliderGroup.SphereCollider[5]{
+                        cmp.Colliders = new VRMSpringBoneColliderGroup.SphereCollider[6]{
                             new VRMSpringBoneColliderGroup.SphereCollider{ Radius = centerRadius, Offset = centerOffset },
                             new VRMSpringBoneColliderGroup.SphereCollider{ Radius = noseRadius, Offset = noseOffset },
-                            new VRMSpringBoneColliderGroup.SphereCollider{ Radius = foreheadRadius, Offset = foreheadOffset },
+                            new VRMSpringBoneColliderGroup.SphereCollider{ Radius = foreheadRadius, Offset = foreheadOffsetL },
+                            new VRMSpringBoneColliderGroup.SphereCollider{ Radius = foreheadRadius, Offset = foreheadOffsetR },
                             new VRMSpringBoneColliderGroup.SphereCollider{ Radius = cheekRadius, Offset = cheekOffsetL },
                             new VRMSpringBoneColliderGroup.SphereCollider{ Radius = cheekRadius, Offset = cheekOffsetR },
                         };

@@ -1,4 +1,3 @@
-using UnityEngine;
 using UnityEditor;
 using VRM;
 
@@ -8,27 +7,27 @@ namespace VRMHelper
     public class SpringBoneHelper : EditorWindow
     {
 
-        [MenuItem("VRM/VRM Helper/Show All VRMSpringBone Gizmos", true)]
+        [MenuItem("VRM/VRM Helper/Spring Bones/Show All VRMSpringBone Gizmos", true)]
         private static bool ShowAllVRMSpringBoneGizmosValidate()
         {
             (var selectedInHierarchy, var selectedInProject) = Helper.IsVRMSelected();
             return selectedInHierarchy || selectedInProject;
         }
 
-        [MenuItem("VRM/VRM Helper/Show All VRMSpringBone Gizmos", false)]
+        [MenuItem("VRM/VRM Helper/Spring Bones/Show All VRMSpringBone Gizmos", false)]
         private static void ShowAllVRMSpringBoneGizmos()
         {
             ShowOrHideAllVRMSpringBoneGizmos(true);
         }
 
-        [MenuItem("VRM/VRM Helper/Hide All VRMSpringBone Gizmos", true)]
+        [MenuItem("VRM/VRM Helper/Spring Bones/Hide All VRMSpringBone Gizmos", true)]
         private static bool HideAllVRMSpringBoneGizmosValidate()
         {
             (var selectedInHierarchy, var selectedInProject) = Helper.IsVRMSelected();
             return selectedInHierarchy || selectedInProject;
         }
 
-        [MenuItem("VRM/VRM Helper/Hide All VRMSpringBone Gizmos", false)]
+        [MenuItem("VRM/VRM Helper/Spring Bones/Hide All VRMSpringBone Gizmos", false)]
         private static void HideAllVRMSpringBoneGizmos()
         {
             ShowOrHideAllVRMSpringBoneGizmos(false);
