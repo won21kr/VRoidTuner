@@ -42,6 +42,7 @@ namespace VRMHelper
                 ser.Update();
                 ser.FindProperty("m_drawGizmo").boolValue = show;
                 ser.ApplyModifiedProperties();
+                EditorUtility.SetDirty(cmp);
             }
         }
 

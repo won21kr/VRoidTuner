@@ -4,6 +4,7 @@ using UnityEditor;
 using VRM;
 using System.Linq;
 using System.Collections.Generic;
+using UnityEditor.Experimental.SceneManagement;
 
 namespace VRMHelper
 {
@@ -12,19 +13,38 @@ namespace VRMHelper
     {
 
         /// <summary>
+        /// プレハブモードでVRMモデルを編集中であるときtrueを返します。
+        /// </summary>
+        private static GameObject GetPrefabRootVRM()
+        {
+            var stage = PrefabStageUtility.GetCurrentPrefabStage();
+            if (stage == null) return null;
+            var result = stage.prefabContentsRoot;
+            if (result.GetComponent<VRMMeta>() == null) return null;
+            return result;
+        }
+
+        private static GameObject FindByName(string name)
+        {
+            var root = GetPrefabRootVRM();
+            if (root == null) return null;
+            foreach (var cmp in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (cmp.gameObject.name == name) return cmp.gameObject;
+            }
+            return null;
+        }
+
+        /// <summary>
         /// 球が作成済みで、かつ表示状態であるときtrueを返します。
         /// </summary>
         private static bool AreCollidersActive()
         {
-            (var selectedInHierarchy, var selectedInProject) = Helper.IsVRMSelected();
-            if (!(selectedInHierarchy || selectedInProject)) return false;
-            foreach (var cmp in Helper.FindAllComponentsInSelected<VRMSpringBoneColliderGroup>())
-            {
-                if (cmp.gameObject.name != "J_Bip_C_Head") continue;
-                var parent = cmp.gameObject.transform.Find("_Colliders_");
-                if (parent != null) return parent.gameObject.activeInHierarchy;
-            }
-            return false;
+            var root = GetPrefabRootVRM();
+            if (root == null) return false;
+            var clds = FindByName("_Colliders_");
+            if (clds == null) return false;
+            return clds.activeInHierarchy;
         }
 
         /// <summary>
@@ -32,9 +52,11 @@ namespace VRMHelper
         /// </summary>
         private static void RevertVisibility()
         {
+            var root = GetPrefabRootVRM();
+            if (root == null) return;
+
             // 隠してあったメッシュを再表示
-            var cmps = Helper.FindAllComponentsInSelected<SkinnedMeshRenderer>();
-            foreach (var cmp in cmps)
+            foreach (var cmp in root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
                 var obj = cmp.gameObject;
                 var isFace = obj.name == "Face";
@@ -42,65 +64,71 @@ namespace VRMHelper
                 var isBody = obj.name == "Body";
                 if (isFace || isHair || isBody) obj.SetActive(true);
                 if (obj.name == "_DummyFace_") obj.SetActive(false); // 半透明の顔は非表示
+                EditorUtility.SetDirty(obj);
             }
 
             // 球を非表示
-            foreach (var cmp in Helper.FindAllComponentsInSelected<VRMSpringBoneColliderGroup>())
-            {
-                if (cmp.gameObject.name != "J_Bip_C_Head") continue;
-                var parent = cmp.gameObject.transform.Find("_Colliders_");
-                if (parent != null)
-                {
-                    parent.gameObject.SetActive(false);
-                }
-            }
+            var clds = FindByName("_Colliders_");
+            if (clds != null) clds.SetActive(false);
+
+            EditorUtility.SetDirty(root);
         }
 
-        [MenuItem("VRM/VRM Helper/Colliders/Begin To Edit Head Colliders", true)]
+        [MenuItem("VRM/VRM Helper/Colliders/Begin To Edit Head Colliders (In Prefab Mode)", true)]
         private static bool BeginToEditHeadCollidersValid()
         {
-            return !AreCollidersActive();
+            return GetPrefabRootVRM() != null && !AreCollidersActive();
         }
 
-        [MenuItem("VRM/VRM Helper/Colliders/Begin To Edit Head Colliders", false)]
+        private static bool IsInitialized = false;
+
+        private static void Init()
+        {
+            if (IsInitialized) return;
+            PrefabStage.prefabStageClosing += (PrefabStage stage) =>
+            {
+                Debug.Log("prefab stage closing: " + stage.prefabAssetPath);
+            };
+            PrefabStage.prefabSaving += (GameObject obj) =>
+            {
+                Debug.Log("prefab saving: " + obj.name);
+            };
+            PrefabStage.prefabSaved += (GameObject obj) =>
+            {
+                Debug.Log("prefab saved: " + obj.name);
+            };
+            IsInitialized = true;
+        }
+
+        [MenuItem("VRM/VRM Helper/Colliders/Begin To Edit Head Colliders (In Prefab Mode)", false)]
         private static void BeginToEditHeadColliders()
         {
-            // 半透明の顔が既にある場合は表示
-            var dummyFaceExists = false;
-            var cmps = Helper.FindAllComponentsInSelected<SkinnedMeshRenderer>();
-            foreach (var cmp in cmps)
-            {
-                if (cmp.gameObject.name == "_DummyFace_")
-                {
-                    cmp.gameObject.SetActive(true);
-                    dummyFaceExists = true;
-                }
-            }
+            Init();
 
-            // 球が既にある場合は表示
-            var collidersExist = false;
-            foreach (var cmp in Helper.FindAllComponentsInSelected<VRMSpringBoneColliderGroup>())
-            {
-                if (cmp.gameObject.name != "J_Bip_C_Head") continue;
-                var parent = cmp.gameObject.transform.Find("_Colliders_");
-                if (parent != null)
-                {
-                    parent.gameObject.SetActive(true);
-                    collidersExist = true;
-                }
-            }
+            var root = GetPrefabRootVRM();
+            if (root == null) return;
+
+            var head = FindByName("J_Bip_C_Head");
+            if (head == null) throw new Exception("J_Bip_C_Head が見つかりません");
+
+            var stage = PrefabStageUtility.GetCurrentPrefabStage();
+            if (stage == null) return;
+
+            // 半透明の顔が既にある場合は表示
+            var dummyFace = FindByName("_DummyFace_");
+            if (dummyFace != null) dummyFace.SetActive(true);
 
             // 全メッシュを隠し、半透明の顔を作成
-            foreach (var cmp in cmps)
+            foreach (var cmp in root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
                 var obj = cmp.gameObject;
                 var isFace = obj.name == "Face";
                 var isHair = obj.name.StartsWith("Hair");
                 var isBody = obj.name == "Body";
-                if (isFace && !dummyFaceExists)
+                if (isFace && dummyFace == null)
                 {
                     // 顔を複製
-                    var dummyFace = Instantiate(obj);
+                    dummyFace = Instantiate(obj);
                     dummyFace.transform.parent = obj.transform.parent;
                     dummyFace.name = "_DummyFace_";
                     dummyFace.hideFlags = HideFlags.DontSave;
@@ -122,40 +150,43 @@ namespace VRMHelper
                 if (isFace || isHair || isBody) obj.SetActive(false);
             }
 
-            if (!collidersExist)
+            var clds = FindByName("_Colliders_");
+            if (clds != null)
             {
-                foreach (var cmp in Helper.FindAllComponentsInSelected<VRMSpringBoneColliderGroup>())
+                // 球を再表示
+                clds.SetActive(true);
+            }
+            else
+            {
+                var mat = AssetDatabase.LoadAssetAtPath<Material>("Assets/VRMHelper/Materials/VRMHelperGizmoMaterial.mat");
+
+                // 球を格納するための親を作成
+                var parent = new GameObject("_Colliders_");
+                parent.transform.parent = head.transform;
+                parent.hideFlags = HideFlags.DontSave;
+                parent.transform.localPosition = new Vector3();
+                parent.transform.localScale = Vector3.one;
+
+                int i = 0;
+                var cgrp = head.GetComponent<VRMSpringBoneColliderGroup>();
+                if (cgrp == null) throw new Exception("J_Bip_C_Head に VRMSpringBoneColliderGroup がアタッチされていません");
+                foreach (var cld in cgrp.Colliders)
                 {
-                    // 頭部ボーンを特定
-                    if (cmp.gameObject.name != "J_Bip_C_Head") continue;
-                    var mat = AssetDatabase.LoadAssetAtPath<Material>("Assets/VRMHelper/Materials/VRMHelperGizmoMaterial.mat");
-
-                    // 球を格納するための親を作成
-                    var parent = new GameObject("_Colliders_");
-                    parent.transform.parent = cmp.gameObject.transform;
-                    parent.hideFlags = HideFlags.DontSave;
-                    parent.transform.localPosition = new Vector3();
-                    parent.transform.localScale = Vector3.one;
-
-                    int i = 0;
-                    foreach (var cld in cmp.Colliders)
+                    // 球を作成
+                    var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    sphere.transform.parent = parent.transform;
+                    sphere.hideFlags = HideFlags.DontSave;
+                    sphere.name = String.Format("Collider{0:000}", i);
+                    if (mat != null)
                     {
-                        // 球を作成
-                        var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                        sphere.transform.parent = parent.transform;
-                        sphere.hideFlags = HideFlags.DontSave;
-                        sphere.name = String.Format("Collider{0:000}", i);
-                        if (mat != null)
-                        {
-                            var mesh = sphere.GetComponent<MeshRenderer>();
-                            mesh.material = mat;
-                            // mesh.material.color = Helper.GizmoColor(i);
-                        }
-                        var s = cld.Radius * 2;
-                        sphere.transform.localScale = new Vector3(s, s, s);
-                        sphere.transform.localPosition = cld.Offset;
-                        i++;
+                        var mesh = sphere.GetComponent<MeshRenderer>();
+                        mesh.material = mat;
+                        // mesh.material.color = Helper.GizmoColor(i);
                     }
+                    var s = cld.Radius * 2;
+                    sphere.transform.localScale = new Vector3(s, s, s);
+                    sphere.transform.localPosition = cld.Offset;
+                    i++;
                 }
             }
         }
@@ -201,31 +232,39 @@ namespace VRMHelper
         /// </summary>
         private static void DoCommitEditedColliders(bool symmetrically = false)
         {
-            foreach (var cmp in Helper.FindAllComponentsInSelected<VRMSpringBoneColliderGroup>())
+            var root = GetPrefabRootVRM();
+            if (root == null) return;
+
+            var head = FindByName("J_Bip_C_Head");
+            if (head == null) throw new Exception("J_Bip_C_Head が見つかりません");
+            var cgrp = head.GetComponent<VRMSpringBoneColliderGroup>();
+            if (cgrp == null) throw new Exception("J_Bip_C_Head に VRMSpringBoneColliderGroup がアタッチされていません");
+
+            var clds = FindByName("_Colliders_");
+            if (clds == null) throw new Exception("_Colliders_ が見つかりません");
+
+            var result = Enumerable.Empty<VRMSpringBoneColliderGroup.SphereCollider>();
+            foreach (var cld in clds.GetComponentsInChildren<SphereCollider>())
             {
-                if (cmp.gameObject.name != "J_Bip_C_Head") continue;
-                var parent = cmp.gameObject.transform.Find("_Colliders_");
-                if (parent == null) continue;
-                var clds = Enumerable.Empty<VRMSpringBoneColliderGroup.SphereCollider>();
-                foreach (var sphere in parent.GetComponentsInChildren<SphereCollider>())
+                var t = cld.GetComponent<Transform>();
+                var radius = t.localScale.magnitude / Vector3.one.magnitude / 2;
+                var offset = t.localPosition;
+                var c = new VRMSpringBoneColliderGroup.SphereCollider{ Radius = radius, Offset = offset };
+                result = result.Append(c);
+                if (symmetrically && 0.001f <= Math.Abs(offset.x))
                 {
-                    var t = sphere.GetComponent<Transform>();
-                    var radius = t.localScale.magnitude / Vector3.one.magnitude / 2;
-                    var offset = t.localPosition;
-                    var cld = new VRMSpringBoneColliderGroup.SphereCollider{ Radius = radius, Offset = offset };
-                    clds = clds.Append(cld);
-                    if (symmetrically && 0.001f <= Math.Abs(offset.x))
-                    {
-                        var offset2 = new Vector3(-offset.x, offset.y, offset.z);
-                        var cld2 = new VRMSpringBoneColliderGroup.SphereCollider{ Radius = radius, Offset = offset2 };
-                        clds = clds.Append(cld2);
-                    }
+                    var offset2 = new Vector3(-offset.x, offset.y, offset.z);
+                    var c2 = new VRMSpringBoneColliderGroup.SphereCollider{ Radius = radius, Offset = offset2 };
+                    result = result.Append(c2);
                 }
-                if (clds.Count() == 0) throw new Exception("球が見つかりません");
-                cmp.Colliders = clds.ToArray();
             }
+            if (result.Count() == 0) throw new Exception("球が見つかりません");
+            cgrp.Colliders = result.ToArray();
 
             RevertVisibility();
+            EditorUtility.SetDirty(head);
+            EditorUtility.SetDirty(root);
+            AssetDatabase.SaveAssets();
         }
 
     }
