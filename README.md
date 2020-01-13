@@ -32,6 +32,8 @@ git submodule add https://github.com/(your-name)/VRMHelper.git
 
 ![](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/34010/0c9b469e-603b-3892-8afa-585887d30605.png)
 
+[リリースページ](https://github.com/but80/VRMHelper/releases) にて解説している機能もあります。ご確認ください。
+
 ## 注意点
 
 - 「長い前髪が顔に埋まる」対策により追加されるコライダーは、制作者の手元のモデルで位置とサイズを調整した球を基準に生成されるため、適用先のモデルによっては顔からはみ出たり大きさが足りなかったりする可能性があります。
