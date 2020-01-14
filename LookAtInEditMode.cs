@@ -13,15 +13,17 @@ namespace VRoidTuner
     public class LookAtInEditMode : MonoBehaviour
     {
 
+        public float LookAtSpeed = 0.2f;         // 視線を動かす速度
+        public int FramesLookingCamera = 60;     // 視線の変更角度が大きすぎるときに一時的にカメラを見るフレーム数
+        public float SafeAngleGap = 115f;        // この角度以上を「視線の変更角度が大きすぎる」と判断
+        public Transform DebugMark;              // 見ようとしている座標をマークするためのデバッグ用オブジェクト
+
         VRMLookAtHead LookAt;
         VRMLookAtBoneApplyer Applyer;
-        Vector3 InterpolatedTarget;
-        Transform LastSelection;
-        int FramesSinceLastSelectionChanged = 0;
-
-        const float LookAtSpeed = 0.2f;
-        const int FramesLookingCamera = 60;
-        const float SafeAngleGap = 60f;
+        Vector3 InterpolatedTarget;              // 補間された視線の先（現在の座標）
+        Transform LastSelection;                 // 最後に選択していたオブジェクト（未選択時はシーンビューのカメラ）
+        int FramesSinceLastSelectionChanged = 0; // 最後に別のオブジェクトを選択してからの経過フレーム数
+        Vector2 mousePosition = new Vector2();   // 現在のマウス座標
 
         void Awake()
         {
@@ -45,6 +47,7 @@ namespace VRoidTuner
             EditorApplication.update += Tick;
         }
 
+        // 頭を中心にSlerpします。
         Vector3 SlerpFromHead(Vector3 p1, Vector3 p2, float r)
         {
             var c = LookAt.Head.position;
@@ -55,15 +58,39 @@ namespace VRoidTuner
             return c + Vector3.Slerp(p1, p2, r);
         }
 
+        // 視線の変更角度が大きすぎないかを調べます。
         bool IsSafeAngleGap(Vector3 p1, Vector3 p2)
         {
             var c = LookAt.Head.position;
             return Vector3.Angle(p1-c, p2-c) <= SafeAngleGap;
         }
 
-        bool IsBehindEyes(Vector3 p)
+        bool IsBehindHead(Vector3 p)
         {
             return p.z <= LookAt.Head.position.z;
+        }
+
+        void OnDrawGizmos()
+        {
+            // マウス座標を取得・保持
+            var camera = SceneView.lastActiveSceneView.camera;
+            mousePosition = Event.current.mousePosition;
+            mousePosition.y = camera.pixelHeight - mousePosition.y;
+        }
+
+        Vector3 WorldMousePosition()
+        {
+            var camera = SceneView.lastActiveSceneView.camera;
+            var result = camera.transform.position;
+            var ray = camera.ScreenPointToRay(mousePosition);
+            var c = LookAt.Head.position;
+            float t = 0;
+            Vector3 q = new Vector3();
+            if (MathUtils.IntersectRaySphere(ray, c, (result-c).magnitude * 0.5f, ref t, ref q))
+            {
+                result = q;
+            }
+            return result;
         }
 
         void Tick()
@@ -79,12 +106,16 @@ namespace VRoidTuner
                 var p2 = selection.position;
                 if (IsSafeAngleGap(p1, p2)) FramesSinceLastSelectionChanged = FramesLookingCamera;
             }
-            var target = selection;
-            if (IsBehindEyes(selection.position) || FramesSinceLastSelectionChanged < FramesLookingCamera)
+            var target = selection; // これから見ようとするオブジェクト
+            if (selection == gameObject.transform ||
+                selection.GetComponent<SkinnedMeshRenderer>() != null ||
+                IsBehindHead(selection.position) ||
+                FramesSinceLastSelectionChanged < FramesLookingCamera)
             {
                 target = camera;
             }
-            var v = target.transform.position;
+            var v = target == camera ? WorldMousePosition() : target.position;
+            if (DebugMark != null) DebugMark.position = v;
             InterpolatedTarget = SlerpFromHead(InterpolatedTarget, v, LookAtSpeed);
             float yaw;
             float pitch;
