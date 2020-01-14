@@ -1,4 +1,4 @@
-﻿#pragma warning disable 0414, 0649
+#pragma warning disable 0414, 0649
 using UnityEngine;
 using VRM;
 
@@ -9,13 +9,18 @@ using UnityEditor;
 namespace VRoidTuner
 {
 
-    [ExecuteInEditMode]
+    [ExecuteAlways]
     public class LookAtInEditMode : MonoBehaviour
     {
 
         VRMLookAtHead LookAt;
         VRMLookAtBoneApplyer Applyer;
-        GameObject LookAtTarget;
+        Vector3 InterpolatedTarget;
+        GameObject LastSelection;
+        int FramesSinceLastSelectionChanged = 0;
+
+        const float LookAtSpeed = 0.1f;
+        const int FramesLookingCamera = 60;
 
         void Awake()
         {
@@ -31,24 +36,43 @@ namespace VRoidTuner
             {
                 Applyer = GetComponent<VRMLookAtBoneApplyer>();
             }
-            Selection.selectionChanged -= OnSelectionChanged;
-            Selection.selectionChanged += OnSelectionChanged;
+            if (InterpolatedTarget == null)
+            {
+                InterpolatedTarget = SceneView.lastActiveSceneView.camera.gameObject.transform.position;
+            }
+            EditorApplication.update -= Tick;
+            EditorApplication.update += Tick;
         }
 
-        void OnSelectionChanged()
+        Vector3 SlerpFromEyes(Vector3 p1, Vector3 p2, float r)
         {
-            LookAtTarget = Selection.activeGameObject;
+            var c = Vector3.Lerp(Applyer.LeftEye.Transform.position, Applyer.RightEye.Transform.position, 0.5f);
+            p1 -= c;
+            p2 -= c;
+            p1.Normalize();
+            p2.Normalize();
+            return c + Vector3.Slerp(p1, p2, r);
         }
 
-        void OnRenderObject()
+        void Tick()
         {
             if (Application.IsPlaying(gameObject)) return;
-            var target = LookAtTarget;
-            if (target == null) target = SceneView.lastActiveSceneView.camera.gameObject;
+            var selection = Selection.activeGameObject;
+            if (LastSelection != selection) FramesSinceLastSelectionChanged = 0;
+            var target = selection;
+            if (target == null || FramesSinceLastSelectionChanged < FramesLookingCamera)
+            {
+                target = SceneView.lastActiveSceneView.camera.gameObject;
+            }
+            var v = target.transform.position;
+            InterpolatedTarget = SlerpFromEyes(InterpolatedTarget, v, LookAtSpeed);
             float yaw;
             float pitch;
-            LookAt.LookWorldPosition(target.transform.position, out yaw, out pitch);
+            LookAt.LookWorldPosition(InterpolatedTarget, out yaw, out pitch);
             ApplyRotations(yaw, pitch);
+
+            FramesSinceLastSelectionChanged++;
+            LastSelection = selection;
         }
 
         // from VRMLookAtBoneApplyer in UniVRM
