@@ -21,6 +21,7 @@ namespace VRoidTuner
 
         const float LookAtSpeed = 0.2f;
         const int FramesLookingCamera = 60;
+        const float SafeAngleGap = 60f;
 
         void Awake()
         {
@@ -54,6 +55,12 @@ namespace VRoidTuner
             return c + Vector3.Slerp(p1, p2, r);
         }
 
+        bool IsSafeAngleGap(Vector3 p1, Vector3 p2)
+        {
+            var c = LookAt.Head.position;
+            return Vector3.Angle(p1-c, p2-c) <= SafeAngleGap;
+        }
+
         bool IsBehindEyes(Vector3 p)
         {
             return p.z <= LookAt.Head.position.z;
@@ -62,12 +69,20 @@ namespace VRoidTuner
         void Tick()
         {
             if (Application.IsPlaying(gameObject)) return;
-            var selection = Selection.activeGameObject?.transform;
-            if (LastSelection != selection) FramesSinceLastSelectionChanged = 0;
-            var target = selection;
-            if (target == null || IsBehindEyes(selection.transform.position) || FramesSinceLastSelectionChanged < FramesLookingCamera)
+            var camera = SceneView.lastActiveSceneView.camera.gameObject.transform;
+            var selection = Selection.activeGameObject?.transform ?? camera;
+            if (LastSelection == null) LastSelection = camera;
+            if (LastSelection != selection)
             {
-                target = SceneView.lastActiveSceneView.camera.gameObject.transform;
+                FramesSinceLastSelectionChanged = 0;
+                var p1 = LastSelection.position;
+                var p2 = selection.position;
+                if (IsSafeAngleGap(p1, p2)) FramesSinceLastSelectionChanged = FramesLookingCamera;
+            }
+            var target = selection;
+            if (IsBehindEyes(selection.position) || FramesSinceLastSelectionChanged < FramesLookingCamera)
+            {
+                target = camera;
             }
             var v = target.transform.position;
             InterpolatedTarget = SlerpFromHead(InterpolatedTarget, v, LookAtSpeed);
