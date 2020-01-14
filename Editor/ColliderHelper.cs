@@ -6,7 +6,7 @@ using System.Linq;
 using System.Collections.Generic;
 using UnityEditor.Experimental.SceneManagement;
 
-namespace VRMHelper
+namespace VRoidTuner
 {
 
     public class ColliderHelper : EditorWindow
@@ -74,7 +74,7 @@ namespace VRMHelper
             EditorUtility.SetDirty(root);
         }
 
-        [MenuItem("VRM/VRM Helper/Colliders/Begin To Edit Head Colliders (In Prefab Mode)", true)]
+        [MenuItem("VRM/VRoidTuner/Colliders/Begin To Edit Head Colliders (In Prefab Mode)", true)]
         private static bool BeginToEditHeadCollidersValid()
         {
             return GetPrefabRootVRM() != null && !AreCollidersActive();
@@ -97,7 +97,7 @@ namespace VRMHelper
             IsInitialized = true;
         }
 
-        [MenuItem("VRM/VRM Helper/Colliders/Begin To Edit Head Colliders (In Prefab Mode)", false)]
+        [MenuItem("VRM/VRoidTuner/Colliders/Begin To Edit Head Colliders (In Prefab Mode)", false)]
         private static void BeginToEditHeadColliders()
         {
             Init();
@@ -155,7 +155,7 @@ namespace VRMHelper
             }
             else
             {
-                var mat = AssetDatabase.LoadAssetAtPath<Material>("Assets/VRMHelper/Materials/VRMHelperGizmoMaterial.mat");
+                var mat = AssetDatabase.LoadAssetAtPath<Material>("Assets/VRoidTuner/Materials/VRMHelperGizmoMaterial.mat");
 
                 // 球を格納するための親を作成
                 var parent = new GameObject("_Colliders_");
@@ -188,37 +188,37 @@ namespace VRMHelper
             }
         }
 
-        [MenuItem("VRM/VRM Helper/Colliders/Commit Edited Colliders", true)]
+        [MenuItem("VRM/VRoidTuner/Colliders/Commit Edited Colliders", true)]
         private static bool CommitEditedCollidersValidate()
         {
             return AreCollidersActive();
         }
 
-        [MenuItem("VRM/VRM Helper/Colliders/Commit Edited Colliders", false)]
+        [MenuItem("VRM/VRoidTuner/Colliders/Commit Edited Colliders", false)]
         private static void CommitEditedColliders()
         {
             DoCommitEditedColliders(false);
         }
 
-        [MenuItem("VRM/VRM Helper/Colliders/Commit Edited Colliders (Symmetrically)", true)]
+        [MenuItem("VRM/VRoidTuner/Colliders/Commit Edited Colliders (Symmetrically)", true)]
         private static bool CommitEditedCollidersSymmetricallyValidate()
         {
             return AreCollidersActive();
         }
 
-        [MenuItem("VRM/VRM Helper/Colliders/Commit Edited Colliders (Symmetrically)", false)]
+        [MenuItem("VRM/VRoidTuner/Colliders/Commit Edited Colliders (Symmetrically)", false)]
         private static void CommitEditedCollidersSymmetrically()
         {
             DoCommitEditedColliders(true);
         }
 
-        [MenuItem("VRM/VRM Helper/Colliders/Rollback Colliders", true)]
+        [MenuItem("VRM/VRoidTuner/Colliders/Rollback Colliders", true)]
         private static bool RollbackCollidersValidate()
         {
             return AreCollidersActive();
         }
 
-        [MenuItem("VRM/VRM Helper/Colliders/Rollback Colliders", false)]
+        [MenuItem("VRM/VRoidTuner/Colliders/Rollback Colliders", false)]
         private static void RollbackColliders()
         {
             RevertVisibility();

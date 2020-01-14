@@ -5,14 +5,14 @@ using UnityEditor;
 using VRM;
 using System.Collections.Generic;
 
-namespace VRMHelper
+namespace VRoidTuner
 {
 
-    public class VRMSetup : EditorWindow
+    public class VRoidTuner : EditorWindow
     {
 
         [Serializable]
-        internal class VRMSetupParams : ScriptableObject
+        internal class VRoidTunerParams : ScriptableObject
         {
 
             internal bool UpdateWhenOffscreen = true;
@@ -68,15 +68,15 @@ namespace VRMHelper
 
         }
 
-        private VRMSetupParams _params;
+        private VRoidTunerParams _params;
         private bool _vrmSelectedInHierarchy;
         private bool _vrmSelectedInProject;
         private bool _hairJointSelected;
 
-        [MenuItem("VRM/VRM Helper/Open Setup Window")]
+        [MenuItem("VRM/VRoidTuner/Open Setup Window")]
         private static void Create()
         {
-            var window = GetWindow<VRMSetup>("VRM Setup");
+            var window = GetWindow<VRoidTuner>("VRoidTuner");
             window.minSize = new Vector2(320, 320);
             window.selectionUpdated();
         }
@@ -108,7 +108,7 @@ namespace VRMHelper
 
             if (_params == null)
             {
-                _params = VRMSetupParams.CreateInstance<VRMSetupParams>();
+                _params = VRoidTunerParams.CreateInstance<VRoidTunerParams>();
             }
 
             GUIStyle caption = new GUIStyle()
