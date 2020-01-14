@@ -155,7 +155,7 @@ namespace VRoidTuner
             }
             else
             {
-                var mat = AssetDatabase.LoadAssetAtPath<Material>("Assets/VRoidTuner/Materials/VRMHelperGizmoMaterial.mat");
+                var mat = AssetDatabase.LoadAssetAtPath<Material>("Assets/VRoidTuner/Materials/VRoidTunerGizmoMaterial.mat");
 
                 // 球を格納するための親を作成
                 var parent = new GameObject("_Colliders_");
