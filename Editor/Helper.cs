@@ -3,7 +3,7 @@ using UnityEditor;
 using VRM;
 using System.Linq;
 
-namespace VRMHelper
+namespace VRoidTuner
 {
 
     internal class Helper
