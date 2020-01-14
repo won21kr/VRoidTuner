@@ -16,10 +16,10 @@ namespace VRoidTuner
         VRMLookAtHead LookAt;
         VRMLookAtBoneApplyer Applyer;
         Vector3 InterpolatedTarget;
-        GameObject LastSelection;
+        Transform LastSelection;
         int FramesSinceLastSelectionChanged = 0;
 
-        const float LookAtSpeed = 0.1f;
+        const float LookAtSpeed = 0.2f;
         const int FramesLookingCamera = 60;
 
         void Awake()
@@ -44,9 +44,9 @@ namespace VRoidTuner
             EditorApplication.update += Tick;
         }
 
-        Vector3 SlerpFromEyes(Vector3 p1, Vector3 p2, float r)
+        Vector3 SlerpFromHead(Vector3 p1, Vector3 p2, float r)
         {
-            var c = Vector3.Lerp(Applyer.LeftEye.Transform.position, Applyer.RightEye.Transform.position, 0.5f);
+            var c = LookAt.Head.position;
             p1 -= c;
             p2 -= c;
             p1.Normalize();
@@ -54,18 +54,23 @@ namespace VRoidTuner
             return c + Vector3.Slerp(p1, p2, r);
         }
 
+        bool IsBehindEyes(Vector3 p)
+        {
+            return p.z <= LookAt.Head.position.z;
+        }
+
         void Tick()
         {
             if (Application.IsPlaying(gameObject)) return;
-            var selection = Selection.activeGameObject;
+            var selection = Selection.activeGameObject?.transform;
             if (LastSelection != selection) FramesSinceLastSelectionChanged = 0;
             var target = selection;
-            if (target == null || FramesSinceLastSelectionChanged < FramesLookingCamera)
+            if (target == null || IsBehindEyes(selection.transform.position) || FramesSinceLastSelectionChanged < FramesLookingCamera)
             {
-                target = SceneView.lastActiveSceneView.camera.gameObject;
+                target = SceneView.lastActiveSceneView.camera.gameObject.transform;
             }
             var v = target.transform.position;
-            InterpolatedTarget = SlerpFromEyes(InterpolatedTarget, v, LookAtSpeed);
+            InterpolatedTarget = SlerpFromHead(InterpolatedTarget, v, LookAtSpeed);
             float yaw;
             float pitch;
             LookAt.LookWorldPosition(InterpolatedTarget, out yaw, out pitch);
