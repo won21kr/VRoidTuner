@@ -13,6 +13,15 @@ namespace VRoidTuner
     public class LookAtInEditMode : SceneViewRenderer
     {
 
+        [System.Serializable]
+        public class BlendShapeWeight
+        {
+            public int Index;
+
+            [Range(0f, 100f)]
+            public float Weight;
+        }
+
         [SerializeField, Range(0, 20), Tooltip("視線が半分の角度を動くまでにかかるフレーム数")]
         int LookAtFrames = 2;
 
@@ -22,6 +31,12 @@ namespace VRoidTuner
         [SerializeField, Range(0f, 180f), Tooltip("この角度以上を「視線の変更角度が大きすぎる」と判断")]
         float SafeAngleGap = 115f;
 
+        [SerializeField, Tooltip("表情を操作する顔のメッシュ")]
+        SkinnedMeshRenderer faceMesh;
+
+        [SerializeField]
+        BlendShapeWeight[] angryShapeWeights;
+
         [SerializeField, Tooltip("見ようとしている座標をマークするためのデバッグ用オブジェクト")]
         Transform DebugMark;
 
@@ -30,6 +45,7 @@ namespace VRoidTuner
         Vector3 InterpolatedTarget;              // 補間された視線の先（現在の座標）
         Transform LastSelection;                 // 最後に選択していたオブジェクト（未選択時はシーンビューのカメラ）
         int SpentFramesSinceLastSelectionChanged = 0; // 最後に別のオブジェクトを選択してからの経過フレーム数
+
 
         Vector2 mousePosition = new Vector2();
         bool isAltDown;
@@ -52,19 +68,45 @@ namespace VRoidTuner
             {
                 InterpolatedTarget = SceneView.lastActiveSceneView.camera.gameObject.transform.position;
             }
-            EditorApplication.playModeStateChanged -= OnPlayModeChanged;
-            EditorApplication.playModeStateChanged += OnPlayModeChanged;
+            if (faceMesh == null)
+            {
+                foreach (var mesh in GetComponentsInChildren<SkinnedMeshRenderer>())
+                {
+                    if (mesh.gameObject.name == "Face") faceMesh = mesh;
+                }
+            }
+            if (angryShapeWeights == null)
+            {
+                angryShapeWeights = new BlendShapeWeight[]{
+                    new BlendShapeWeight{ Index=0, Weight=100 }
+                };
+            }
+            // EditorApplication.playModeStateChanged -= OnPlayModeChanged;
+            // EditorApplication.playModeStateChanged += OnPlayModeChanged;
         }
 
-        void OnPlayModeChanged(PlayModeStateChange state)
+        // static LookAtInEditMode() {
+        //     Debug.Log("Play");
+        // }
+
+        // void OnPlayModeChanged(PlayModeStateChange state)
+        // {
+        //     ResetModification();
+        // }
+
+        void ResetModification()
         {
             ApplyRotations(0, 0);
+            for (var i=0; i<faceMesh.sharedMesh.blendShapeCount; i++)
+            {
+                faceMesh.SetBlendShapeWeight(i, 0);
+            }
         }
 
         internal override void OnDestroyInEditor()
         {
-            EditorApplication.playModeStateChanged -= OnPlayModeChanged;
-            ApplyRotations(0, 0);
+            // EditorApplication.playModeStateChanged -= OnPlayModeChanged;
+            ResetModification();
         }
 
         // 頭を中心にSlerpします。
@@ -119,6 +161,7 @@ namespace VRoidTuner
             }
 
             var camera = view.camera.gameObject.transform;
+            ModifyBlendShape(camera);
 
             var selection = Selection.activeGameObject?.transform ?? camera;
             if (LastSelection == null) LastSelection = camera;
@@ -152,8 +195,7 @@ namespace VRoidTuner
 
         void LookAtImmediately(Vector3 target)
         {
-            float yaw;
-            float pitch;
+            float yaw, pitch;
             LookAt.LookWorldPosition(target, out yaw, out pitch);
             ApplyRotations(yaw, pitch);
         }
@@ -209,6 +251,19 @@ namespace VRoidTuner
 
             if (forward == Vector3.zero) return Quaternion.identity; // to suppress warnings
             return Quaternion.LookRotation(forward, upwards);
+        }
+
+        void ModifyBlendShape(Transform camera)
+        {
+            var localCamera = LookAt.Head.worldToLocalMatrix.MultiplyPoint(camera.position);
+            float yaw, pitch;
+            Matrix4x4.identity.CalcYawPitch(localCamera, out yaw, out pitch);
+            var angry = Mathf.Clamp((-pitch - 10f) / 40f, 0f, 1f);
+
+            foreach (var w in angryShapeWeights)
+            {
+                faceMesh.SetBlendShapeWeight(w.Index, w.Weight * angry);
+            }
         }
 
     }
