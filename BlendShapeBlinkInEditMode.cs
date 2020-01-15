@@ -8,42 +8,29 @@ namespace VRoidTuner
 {
 
     [ExecuteAlways]
-    public class BlendShapeBlinkInEditMode : MonoBehaviour
+    public class BlendShapeBlinkInEditMode : SceneViewRenderer
     {
 
-        double LastTimestamp;
-        float SpentTimeSinceLastFrame;
-        const float FrameTime = 1f/60f;
-
-        void Awake()
+        internal override void OnAwakeInEditor()
         {
-            LastTimestamp = EditorApplication.timeSinceStartup;
-            SceneView.duringSceneGui -= OnSceneGUI;
-            SceneView.duringSceneGui += OnSceneGUI;
             var blink = GetComponent<BlendShapeBlink>();
             if (blink != null) blink.ResetBlinking();
         }
 
-        void OnDestroy()
+        internal override void OnDestroyInEditor()
         {
-            SceneView.duringSceneGui -= OnSceneGUI;
+            var blink = GetComponent<BlendShapeBlink>();
+            if (blink != null)
+            {
+                blink.ResetBlinking();
+                blink.LateUpdate();
+            }
         }
 
-        void OnSceneGUI(SceneView view)
+        internal override void OnFixedUpdateInEditor(SceneView view)
         {
-            if (Application.IsPlaying(gameObject)) return;
-
-            var timestamp = EditorApplication.timeSinceStartup;
-            var deltaSec = (float)(timestamp - LastTimestamp);
-            LastTimestamp = timestamp;
-
-            SpentTimeSinceLastFrame += deltaSec;
-            if (FrameTime <= SpentTimeSinceLastFrame)
-            {
-                SpentTimeSinceLastFrame %= FrameTime;
-                var blink = GetComponent<BlendShapeBlink>();
-                if (blink != null) blink.LateUpdate();
-            }
+            var blink = GetComponent<BlendShapeBlink>();
+            if (blink != null) blink.LateUpdate();
         }
 
     }

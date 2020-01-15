@@ -9,23 +9,32 @@ using UnityEditor;
 namespace VRoidTuner
 {
 
-    [ExecuteAlways]
-    public class LookAtInEditMode : MonoBehaviour
+    [ExecuteAlways, InitializeOnLoadAttribute]
+    public class LookAtInEditMode : SceneViewRenderer
     {
 
-        public float LookAtSpeed = 0.2f;         // 視線を動かす速度
-        public int FramesLookingCamera = 60;     // 視線の変更角度が大きすぎるときに一時的にカメラを見るフレーム数
-        public float SafeAngleGap = 115f;        // この角度以上を「視線の変更角度が大きすぎる」と判断
-        public Transform DebugMark;              // 見ようとしている座標をマークするためのデバッグ用オブジェクト
+        [SerializeField, Range(0, 20), Tooltip("視線が半分の角度を動くまでにかかるフレーム数")]
+        int LookAtFrames = 2;
+
+        [SerializeField, Range(0, 150), Tooltip("視線の変更角度が大きすぎるときに一時的にカメラを見るフレーム数")]
+        int TransientFrames = 50;
+
+        [SerializeField, Range(0f, 180f), Tooltip("この角度以上を「視線の変更角度が大きすぎる」と判断")]
+        float SafeAngleGap = 115f;
+
+        [SerializeField, Tooltip("見ようとしている座標をマークするためのデバッグ用オブジェクト")]
+        Transform DebugMark;
 
         VRMLookAtHead LookAt;
         VRMLookAtBoneApplyer Applyer;
         Vector3 InterpolatedTarget;              // 補間された視線の先（現在の座標）
         Transform LastSelection;                 // 最後に選択していたオブジェクト（未選択時はシーンビューのカメラ）
-        int FramesSinceLastSelectionChanged = 0; // 最後に別のオブジェクトを選択してからの経過フレーム数
-        Vector2 mousePosition = new Vector2();   // 現在のマウス座標
+        int SpentFramesSinceLastSelectionChanged = 0; // 最後に別のオブジェクトを選択してからの経過フレーム数
 
-        void Awake()
+        Vector2 mousePosition = new Vector2();
+        bool isAltDown;
+
+        internal override void OnAwakeInEditor()
         {
             if (LookAt == null)
             {
@@ -43,26 +52,40 @@ namespace VRoidTuner
             {
                 InterpolatedTarget = SceneView.lastActiveSceneView.camera.gameObject.transform.position;
             }
-            EditorApplication.update -= Tick;
-            EditorApplication.update += Tick;
+            EditorApplication.playModeStateChanged -= OnPlayModeChanged;
+            EditorApplication.playModeStateChanged += OnPlayModeChanged;
+        }
+
+        void OnPlayModeChanged(PlayModeStateChange state)
+        {
+            ApplyRotations(0, 0);
+        }
+
+        internal override void OnDestroyInEditor()
+        {
+            EditorApplication.playModeStateChanged -= OnPlayModeChanged;
+            ApplyRotations(0, 0);
         }
 
         // 頭を中心にSlerpします。
-        Vector3 SlerpFromHead(Vector3 p1, Vector3 p2, float r)
+        Vector3 SlerpFromHead(Vector3 from, Vector3 to)
         {
-            var c = LookAt.Head.position;
-            p1 -= c;
-            p2 -= c;
-            p1.Normalize();
-            p2.Normalize();
-            return c + Vector3.Slerp(p1, p2, r);
+            if (LookAtFrames <= 0) return to;
+            // from=1, to=0 として0に漸近する指数関数に見立てる
+            float r = Mathf.Pow(0.5f, 1f/LookAtFrames); // 1フレームあたりr倍
+            var head = LookAt.Head.position;
+            from -= head;
+            to -= head;
+            from.Normalize();
+            to.Normalize();
+            return head + Vector3.Slerp(to, from, r);
         }
 
         // 視線の変更角度が大きすぎないかを調べます。
         bool IsSafeAngleGap(Vector3 p1, Vector3 p2)
         {
-            var c = LookAt.Head.position;
-            return Vector3.Angle(p1-c, p2-c) <= SafeAngleGap;
+            var head = LookAt.Head.position;
+            return Vector3.Angle(p1-head, p2-head) <= SafeAngleGap;
         }
 
         bool IsBehindHead(Vector3 p)
@@ -70,60 +93,69 @@ namespace VRoidTuner
             return p.z <= LookAt.Head.position.z;
         }
 
-        void OnDrawGizmos()
+        static Vector3 PerpendicularFoot(Ray r, Vector3 from)
         {
-            // マウス座標を取得・保持
-            var camera = SceneView.lastActiveSceneView.camera;
-            mousePosition = Event.current.mousePosition;
-            mousePosition.y = camera.pixelHeight - mousePosition.y;
+         return r.origin + Vector3.Project(from - r.origin, r.direction);
         }
 
-        Vector3 WorldMousePosition()
+        Vector3 WorldMousePosition(Camera camera)
         {
-            var camera = SceneView.lastActiveSceneView.camera;
-            var result = camera.transform.position;
             var ray = camera.ScreenPointToRay(mousePosition);
-            var c = LookAt.Head.position;
+            var head = LookAt.Head.position;
             float t = 0;
             Vector3 q = new Vector3();
-            if (MathUtils.IntersectRaySphere(ray, c, (result-c).magnitude * 0.5f, ref t, ref q))
-            {
-                result = q;
-            }
-            return result;
+            float r = (camera.transform.position - head).magnitude * 0.3f;
+            if (MathUtils.IntersectRaySphere(ray, head, r, ref t, ref q)) return q;
+            return PerpendicularFoot(ray, head);
         }
 
-        void Tick()
+        internal override void OnFixedUpdateInEditor(SceneView view)
         {
-            if (Application.IsPlaying(gameObject)) return;
-            var camera = SceneView.lastActiveSceneView.camera.gameObject.transform;
+            if (Event.current != null)
+            {
+                mousePosition = Event.current.mousePosition;
+                mousePosition.y = view.camera.pixelHeight - mousePosition.y;
+                isAltDown = Event.current.alt;
+            }
+
+            var camera = view.camera.gameObject.transform;
+
             var selection = Selection.activeGameObject?.transform ?? camera;
             if (LastSelection == null) LastSelection = camera;
             if (LastSelection != selection)
             {
-                FramesSinceLastSelectionChanged = 0;
+                SpentFramesSinceLastSelectionChanged = 0;
                 var p1 = LastSelection.position;
                 var p2 = selection.position;
-                if (IsSafeAngleGap(p1, p2)) FramesSinceLastSelectionChanged = FramesLookingCamera;
+                if (IsSafeAngleGap(p1, p2)) SpentFramesSinceLastSelectionChanged = TransientFrames;
             }
             var target = selection; // これから見ようとするオブジェクト
+            var isTransitional = SpentFramesSinceLastSelectionChanged < TransientFrames; // 一時的にカメラを見ている
             if (selection == gameObject.transform ||
                 selection.GetComponent<SkinnedMeshRenderer>() != null ||
                 IsBehindHead(selection.position) ||
-                FramesSinceLastSelectionChanged < FramesLookingCamera)
+                isAltDown ||
+                isTransitional)
             {
                 target = camera;
             }
-            var v = target == camera ? WorldMousePosition() : target.position;
+            var lookAtMouse = target == camera && !isAltDown && !isTransitional;
+            var v = lookAtMouse ? WorldMousePosition(view.camera) : target.position;
             if (DebugMark != null) DebugMark.position = v;
-            InterpolatedTarget = SlerpFromHead(InterpolatedTarget, v, LookAtSpeed);
+            // TODO: vをFOVの範囲に吸着
+            InterpolatedTarget = SlerpFromHead(InterpolatedTarget, v);
+            LookAtImmediately(InterpolatedTarget);
+
+            SpentFramesSinceLastSelectionChanged++;
+            LastSelection = selection;
+        }
+
+        void LookAtImmediately(Vector3 target)
+        {
             float yaw;
             float pitch;
-            LookAt.LookWorldPosition(InterpolatedTarget, out yaw, out pitch);
+            LookAt.LookWorldPosition(target, out yaw, out pitch);
             ApplyRotations(yaw, pitch);
-
-            FramesSinceLastSelectionChanged++;
-            LastSelection = selection;
         }
 
         // from VRMLookAtBoneApplyer in UniVRM
