@@ -129,14 +129,22 @@ namespace VRoidTuner
                     dummyFace.hideFlags = HideFlags.DontSave;
                     // 半透明化
                     var mesh = dummyFace.GetComponent<SkinnedMeshRenderer>();
+                    var noopShader = Shader.Find("VRoidTuner/Noop");
                     for (var i=0; i < mesh.materials.Length; i++)
                     {
                         var mat = mesh.materials[i];
-                        var c = mat.GetColor("_Color");
-                        c.a = mat.name.Contains("_Face_") ? 0.5f : 0f;
-                        mat.SetColor("_Color", c);
-                        mat.SetFloat("_BlendMode", (float)MToon.RenderMode.Transparent);
-                        MToon.Utils.ValidateBlendMode(mat, MToon.RenderMode.Transparent, true);
+                        if (mat.name.Contains("_Face_"))
+                        {
+                            var c = mat.GetColor("_Color");
+                            c.a = 0.5f;
+                            mat.SetColor("_Color", c);
+                            mat.SetFloat("_BlendMode", (float)MToon.RenderMode.Transparent);
+                            MToon.Utils.ValidateBlendMode(mat, MToon.RenderMode.Transparent, true);
+                        }
+                        else
+                        {
+                            mat.shader = noopShader;
+                        }
                     }
                 }
                 if (isFace || isHair || isBody) obj.SetActive(false);
