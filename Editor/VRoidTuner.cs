@@ -1,9 +1,7 @@
 using System;
-using System.IO;
 using UnityEngine;
 using UnityEditor;
 using VRM;
-using System.Collections.Generic;
 
 namespace VRoidTuner
 {
@@ -68,7 +66,11 @@ namespace VRoidTuner
 
         }
 
+        static GUIStyle caption;
+        static GUIStyle foldout;
+
         private VRoidTunerParams _params;
+        private Vector2 _scrollPos = Vector2.zero;
         private bool _vrmSelectedInHierarchy;
         private bool _vrmSelectedInProject;
         private bool _hairJointSelected;
@@ -77,7 +79,7 @@ namespace VRoidTuner
         private static void Create()
         {
             var window = GetWindow<VRoidTuner>("VRoidTuner");
-            window.minSize = new Vector2(320, 320);
+            window.minSize = new Vector2(350, 350);
             window.selectionUpdated();
         }
 
@@ -99,55 +101,87 @@ namespace VRoidTuner
             Repaint();
         }
 
-        private bool _isSetupSectionOpen = true;
-        private bool _isTwistHairSectionOpen = true;
+        class Section : IDisposable
+        {
+            IDisposable scope;
+            public Section(string title, float labelWidth, bool enabled)
+            {
+                scope = new GUILayout.VerticalScope();
+                GUI.enabled = enabled;
+                if (caption == null)
+                {
+                    caption = new GUIStyle()
+                    {
+                        alignment = TextAnchor.MiddleLeft,
+                        fontStyle = FontStyle.Bold,
+                    };
+                }
+                EditorGUILayout.LabelField(title, caption);
+                EditorGUIUtility.labelWidth = labelWidth;
+                EditorGUI.indentLevel++;
+            }
+            public void Dispose()
+            {
+                EditorGUI.indentLevel--;
+                scope.Dispose();
+                EditorGUILayout.Separator();
+            }
+        }
+
+        class Group
+        {
+            bool isOpen = true;
+
+            public void Foldout(string title, Action a)
+            {
+                GUI.enabled = true;
+                if (foldout == null)
+                {
+                    foldout = new GUIStyle(EditorStyles.foldout);
+                    foldout.fontStyle = FontStyle.Bold;
+                }
+                isOpen = EditorGUILayout.Foldout(isOpen, title, foldout);
+                if (isOpen)
+                {
+                    EditorGUI.indentLevel++;
+                    a();
+                    EditorGUILayout.Separator();
+                    EditorGUI.indentLevel--;
+                }
+            }
+        }
+
+        private Group SetupGroup = new Group();
+        private Group EtcGroup = new Group();
 
         private void OnGUI()
         {
             selectionUpdated();
+
+            _scrollPos = EditorGUILayout.BeginScrollView(_scrollPos);
 
             if (_params == null)
             {
                 _params = VRoidTunerParams.CreateInstance<VRoidTunerParams>();
             }
 
-            GUIStyle caption = new GUIStyle()
-            {
-                alignment = TextAnchor.MiddleLeft,
-                fontStyle = FontStyle.Bold,
-            };
-
-            GUIStyle foldout = new GUIStyle(EditorStyles.foldout);
-            foldout.fontStyle = FontStyle.Bold;
-
             var originalLabelWidth = EditorGUIUtility.labelWidth;
-            GUI.enabled = true;
 
-            if (_isSetupSectionOpen = EditorGUILayout.Foldout(_isSetupSectionOpen, "セットアップ", foldout))
+            SetupGroup.Foldout("セットアップ", () =>
             {
-                EditorGUI.indentLevel++;
-
                 if (!(_vrmSelectedInHierarchy || _vrmSelectedInProject))
                 {
                     EditorGUILayout.HelpBox("プロジェクトアセットまたはヒエラルキー内のVRMモデルプレハブを選択してください。", MessageType.Error);
+                    EditorGUILayout.Separator();
                 }
 
-                using (new GUILayout.VerticalScope())
+                using (new Section("「顔のメッシュが消える」対策", 270, _vrmSelectedInHierarchy || _vrmSelectedInProject))
                 {
-                    GUI.enabled = _vrmSelectedInHierarchy || _vrmSelectedInProject;
-                    EditorGUILayout.LabelField("「顔のメッシュが消える」対策", caption);
-                    EditorGUIUtility.labelWidth = 270;
-                    EditorGUI.indentLevel++;
                     _params.UpdateWhenOffscreen = EditorGUILayout.Toggle("全メッシュの UpdateWhenOffscreen を On", _params.UpdateWhenOffscreen);
-                    EditorGUI.indentLevel--;
                 }
 
-                using (new GUILayout.VerticalScope())
+                using (new Section("「VRで一人称視点にすると顔の裏面で視界が埋まる」対策", 270, _vrmSelectedInHierarchy))
                 {
-                    GUI.enabled = _vrmSelectedInHierarchy;
-                    EditorGUILayout.LabelField("「VRで一人称視点にすると顔の裏面で視界が埋まる」対策", caption);
-                    EditorGUIUtility.labelWidth = 270;
-                    EditorGUI.indentLevel++;
                     _params.UseFirstPersonOnlyLayer = EditorGUILayout.Toggle("FIRSTPERSON_ONLY_LAYER レイヤに設定", _params.UseFirstPersonOnlyLayer);
                     EditorGUILayout.HelpBox(
                         "Face・Hair メッシュを FIRSTPERSON_ONLY_LAYER レイヤに設定します（定義されている場合のみ）。",
@@ -155,27 +189,17 @@ namespace VRoidTuner
                     if (_vrmSelectedInProject) EditorGUILayout.HelpBox(
                         "ヒエラルキー中のオブジェクトにのみ適用されます。プロジェクトアセット中のプレハブに対する変更は保存されません。",
                         MessageType.Warning);
-                    EditorGUI.indentLevel--;
                 }
 
-                using (new GUILayout.VerticalScope())
+                using (new Section("「顔に影が落ちてうっとうしい」対策", 270, _vrmSelectedInHierarchy || _vrmSelectedInProject))
                 {
-                    GUI.enabled = _vrmSelectedInHierarchy || _vrmSelectedInProject;
-                    EditorGUILayout.LabelField("「顔に影が落ちてうっとうしい」対策", caption);
-                    EditorGUIUtility.labelWidth = 270;
-                    EditorGUI.indentLevel++;
                     _params.TurnOffReceivesShadowsOnFace = EditorGUILayout.Toggle("Face の ReceivesShadows を Off", _params.TurnOffReceivesShadowsOnFace);
                     _params.TurnOffReceivesShadowsOnHair = EditorGUILayout.Toggle("Hair の ReceivesShadows を Off", _params.TurnOffReceivesShadowsOnHair);
                     _params.TurnOffReceivesShadowsOnBody = EditorGUILayout.Toggle("Body の ReceivesShadows を Off", _params.TurnOffReceivesShadowsOnBody);
-                    EditorGUI.indentLevel--;
                 }
 
-                using (new GUILayout.VerticalScope())
+                using (new Section("「目のハイライトが暗い」対策", 270, _vrmSelectedInHierarchy || _vrmSelectedInProject))
                 {
-                    GUI.enabled = _vrmSelectedInHierarchy || _vrmSelectedInProject;
-                    EditorGUILayout.LabelField("「目のハイライトが暗い」対策", caption);
-                    EditorGUIUtility.labelWidth = 270;
-                    EditorGUI.indentLevel++;
                     _params.MakeEyeHighlightUnlit = EditorGUILayout.Toggle("ハイライトのシェーダを Unlit に変更", _params.MakeEyeHighlightUnlit);
                     EditorGUILayout.HelpBox(
                         "名前に \"EyeHighlight\" が含まれるマテリアルのシェーダを \"VRM/UnlitTransparent\" に変更します。",
@@ -183,25 +207,15 @@ namespace VRoidTuner
                     if (_vrmSelectedInHierarchy) EditorGUILayout.HelpBox(
                         "プロジェクトアセット中のパラメータが変更されるため、この設定はプロジェクトを通じて共有されます。",
                         MessageType.Warning);
-                    EditorGUI.indentLevel--;
                 }
 
-                using (new GUILayout.VerticalScope())
+                using (new Section("「カメラの方を見てくれない」対策", 270, _vrmSelectedInHierarchy || _vrmSelectedInProject))
                 {
-                    GUI.enabled = _vrmSelectedInHierarchy || _vrmSelectedInProject;
-                    EditorGUILayout.LabelField("「カメラの方を見てくれない」対策", caption);
-                    EditorGUIUtility.labelWidth = 270;
-                    EditorGUI.indentLevel++;
                     _params.DoVRMLookAtHeadAtLateUpdate = EditorGUILayout.Toggle("VRMLookAtHead を LateUpdate で行う", _params.DoVRMLookAtHeadAtLateUpdate);
-                    EditorGUI.indentLevel--;
                 }
 
-                using (new GUILayout.VerticalScope())
+                using (new Section("「揺れものが思い通りに揺れない」対策", 270, _vrmSelectedInHierarchy || _vrmSelectedInProject))
                 {
-                    GUI.enabled = _vrmSelectedInHierarchy || _vrmSelectedInProject;
-                    EditorGUILayout.LabelField("「揺れものが思い通りに揺れない」対策", caption);
-                    EditorGUIUtility.labelWidth = 270;
-                    EditorGUI.indentLevel++;
                     _params.OverwriteDragForce = EditorGUILayout.Toggle("DragForce（抵抗力）を変更", _params.OverwriteDragForce);
                     _params.DragForceOffset = EditorGUILayout.FloatField("        基準値", _params.DragForceOffset);
                     _params.GravityPowerToDragForceRatio = EditorGUILayout.FloatField("        + GravityPower ×", _params.GravityPowerToDragForceRatio);
@@ -214,15 +228,10 @@ namespace VRoidTuner
                     if (_vrmSelectedInHierarchy) EditorGUILayout.HelpBox(
                         "ヒエラルキー中のオブジェクトに対する変更は、開始時に破棄される場合があります。これを避けるには、プレハブに上書き保存してください。",
                         MessageType.Warning);
-                    EditorGUI.indentLevel--;
                 }
 
-                using (new GUILayout.VerticalScope())
+                using (new Section("「長い前髪が顔に埋まる」対策", 270, _vrmSelectedInHierarchy || _vrmSelectedInProject))
                 {
-                    GUI.enabled = _vrmSelectedInHierarchy || _vrmSelectedInProject;
-                    EditorGUILayout.LabelField("「長い前髪が顔に埋まる」対策", caption);
-                    EditorGUIUtility.labelWidth = 270;
-                    EditorGUI.indentLevel++;
                     _params.AddHeadColliders = EditorGUILayout.Toggle("J_Bip_C_Head にコライダーを追加", _params.AddHeadColliders);
                     EditorGUILayout.HelpBox(
                         "J_Bip_C_Head の VRM Spring Bone Collider Group にコライダーを追加します。\n" +
@@ -231,55 +240,91 @@ namespace VRoidTuner
                     if (_vrmSelectedInHierarchy) EditorGUILayout.HelpBox(
                         "ヒエラルキー中のオブジェクトに対する変更は、開始時に破棄される場合があります。これを避けるには、プレハブに上書き保存してください。",
                         MessageType.Warning);
-                    EditorGUI.indentLevel--;
                 }
 
-                using (new GUILayout.VerticalScope())
+                using (new Section("その他の設定", 270, _vrmSelectedInHierarchy || _vrmSelectedInProject))
                 {
-                    GUI.enabled = _vrmSelectedInHierarchy || _vrmSelectedInProject;
-                    EditorGUILayout.LabelField("その他", caption);
-                    EditorGUIUtility.labelWidth = 270;
-                    EditorGUI.indentLevel++;
                     _params.ShuffleSpringBoneGizmoColors = EditorGUILayout.Toggle("VRMSpringBone のギズモ色をシャッフル", _params.ShuffleSpringBoneGizmoColors);
                     if (_vrmSelectedInHierarchy) EditorGUILayout.HelpBox(
                         "プロジェクトアセット中のパラメータが変更されるため、この設定はプロジェクトを通じて共有されます。",
                         MessageType.Warning);
-                    EditorGUI.indentLevel--;
                 }
 
                 using (new GUILayout.HorizontalScope())
                 {
                     GUI.enabled = _vrmSelectedInHierarchy || _vrmSelectedInProject;
+                    GUILayout.FlexibleSpace();
                     if (GUILayout.Button("適用")) ApplyOptimization();
                 }
+            });
 
-                EditorGUILayout.LabelField("");
-                EditorGUI.indentLevel--;
-            }
-
-            GUI.enabled = true;
-            if (_isTwistHairSectionOpen = EditorGUILayout.Foldout(_isTwistHairSectionOpen, "髪束をひねる", foldout))
+            EtcGroup.Foldout("その他の操作", () =>
             {
-                EditorGUI.indentLevel++;
 
-                if (!_hairJointSelected)
+                using (new Section("顔コライダー", 270, FaceColliderTuner.IsVRMPrefabMode()))
                 {
-                    EditorGUILayout.HelpBox("ヒエラルキー内の髪ボーン（HairJoint-*）を選択してください。", MessageType.Error);
+                    if (!FaceColliderTuner.IsVRMPrefabMode())
+                    {
+                        EditorGUILayout.HelpBox("プレハブモードでVRMモデルを編集状態にしてください。", MessageType.Error);
+                        EditorGUILayout.Separator();
+                    }
+
+                    using (new GUILayout.HorizontalScope())
+                    {
+                        GUILayout.FlexibleSpace();
+
+                        GUI.enabled = FaceColliderTuner.IsVRMPrefabMode() && !FaceColliderTuner.AreCollidersActive();
+                        if (GUILayout.Button("編集開始")) FaceColliderTuner.BeginToEditHeadColliders();
+
+                        GUI.enabled = FaceColliderTuner.AreCollidersActive();
+                        if (GUILayout.Button("完了")) FaceColliderTuner.CommitEditedColliders(false);
+                        if (GUILayout.Button("完了(鏡像化)")) FaceColliderTuner.CommitEditedColliders(true);
+                        if (GUILayout.Button("破棄")) FaceColliderTuner.RollbackColliders();
+                    }
                 }
 
-                GUI.enabled = _hairJointSelected;
-                EditorGUIUtility.labelWidth = 270;
-                _params.HairJointTwistAngle = EditorGUILayout.FloatField("角度", _params.HairJointTwistAngle);
-
-                using (new GUILayout.HorizontalScope())
+                using (new Section("揺れもの", 270, _vrmSelectedInHierarchy))
                 {
-                    if (GUILayout.Button("適用")) TwistHairJoint();
+                    if (!_vrmSelectedInHierarchy)
+                    {
+                        EditorGUILayout.HelpBox("ヒエラルキー内のVRMモデルプレハブを選択してください。", MessageType.Error);
+                        EditorGUILayout.Separator();
+                    }
+
+                    using (new GUILayout.HorizontalScope())
+                    {
+                        GUI.enabled = _vrmSelectedInHierarchy;
+                        GUILayout.FlexibleSpace();
+                        if (GUILayout.Button("揺れものギズモ表示")) HairTuner.ShowAllVRMSpringBoneGizmos(true);
+                        if (GUILayout.Button("非表示")) HairTuner.ShowAllVRMSpringBoneGizmos(false);
+                    }
                 }
 
-                EditorGUILayout.LabelField("");
-                EditorGUI.indentLevel--;
-            }
+                using (new Section("髪束をひねる", 270, _hairJointSelected))
+                {
+                    if (!_hairJointSelected)
+                    {
+                        EditorGUILayout.HelpBox("ヒエラルキー内の髪ボーン（HairJoint-*）を選択してください。", MessageType.Error);
+                        EditorGUILayout.Separator();
+                    }
 
+                    using (new GUILayout.VerticalScope())
+                    {
+                        GUI.enabled = _hairJointSelected;
+                        EditorGUIUtility.labelWidth = 270;
+                        _params.HairJointTwistAngle = EditorGUILayout.FloatField("角度", _params.HairJointTwistAngle);
+                    }
+                    EditorGUILayout.Separator();
+
+                    using (new GUILayout.HorizontalScope())
+                    {
+                        GUILayout.FlexibleSpace();
+                        if (GUILayout.Button("適用")) HairTuner.TwistHairJoint(_params.HairJointTwistAngle);
+                    }
+                }
+            });
+
+            EditorGUILayout.EndScrollView();
             EditorGUIUtility.labelWidth = originalLabelWidth;
             GUI.enabled = true;
         }
@@ -420,41 +465,6 @@ namespace VRoidTuner
                         EditorUtility.SetDirty(cmp);
                         EditorUtility.SetDirty(cmp.gameObject);
                     }
-                }
-            }
-        }
-
-        private Transform GetFirstChild(Transform t)
-        {
-            foreach (var u in t.GetComponentsInChildren<Transform>())
-            {
-                if (u.parent == t) return u;
-            }
-            return null;
-        }
-
-        private void TwistHairJoint()
-        {
-            foreach (var root in Selection.GetFiltered<Transform>(SelectionMode.TopLevel))
-            {
-                if (!root.name.StartsWith("HairJoint-")) continue;
-
-                // 子孫オブジェクトを先端まで取得
-                var cmps = new List<Transform>();
-                for (var cmp = root; cmp != null; cmp = GetFirstChild(cmp))
-                {
-                    cmps.Add(cmp);
-                }
-
-                var step = _params.HairJointTwistAngle / cmps.Count;
-                var angle = 0f;
-                foreach (var cmp in cmps)
-                {
-                    angle += step;
-                    var a = cmp.eulerAngles;
-                    a.y = angle;
-                    cmp.eulerAngles = a;
-                    EditorUtility.SetDirty(cmp);
                 }
             }
         }

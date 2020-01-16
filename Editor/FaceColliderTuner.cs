@@ -9,13 +9,18 @@ using UnityEditor.Experimental.SceneManagement;
 namespace VRoidTuner
 {
 
-    public class ColliderHelper : EditorWindow
+    public class FaceColliderTuner : EditorWindow
     {
 
         /// <summary>
         /// プレハブモードでVRMモデルを編集中であるときtrueを返します。
         /// </summary>
-        private static GameObject GetPrefabRootVRM()
+        internal static bool IsVRMPrefabMode()
+        {
+            return GetPrefabRootVRM() != null;
+        }
+
+        internal static GameObject GetPrefabRootVRM()
         {
             var stage = PrefabStageUtility.GetCurrentPrefabStage();
             if (stage == null) return null;
@@ -24,7 +29,7 @@ namespace VRoidTuner
             return result;
         }
 
-        private static GameObject FindByName(string name)
+        internal static GameObject FindByName(string name)
         {
             var root = GetPrefabRootVRM();
             if (root == null) return null;
@@ -38,7 +43,7 @@ namespace VRoidTuner
         /// <summary>
         /// 球が作成済みで、かつ表示状態であるときtrueを返します。
         /// </summary>
-        private static bool AreCollidersActive()
+        internal static bool AreCollidersActive()
         {
             var root = GetPrefabRootVRM();
             if (root == null) return false;
@@ -50,7 +55,7 @@ namespace VRoidTuner
         /// <summary>
         /// 編集を終了するため、オブジェクトの表示状態を通常の状態に戻します。
         /// </summary>
-        private static void RevertVisibility(GameObject root = null)
+        internal static void RevertVisibility(GameObject root = null)
         {
             if (root == null) root = GetPrefabRootVRM();
             if (root == null) return;
@@ -74,22 +79,16 @@ namespace VRoidTuner
             EditorUtility.SetDirty(root);
         }
 
-        [MenuItem("VRM/VRoidTuner/Colliders/Begin To Edit Head Colliders (In Prefab Mode)", true)]
-        private static bool BeginToEditHeadCollidersValid()
-        {
-            return GetPrefabRootVRM() != null && !AreCollidersActive();
-        }
+        internal static bool IsInitialized = false;
 
-        private static bool IsInitialized = false;
-
-        private static void onPrefabStageOpenedOrClosing(PrefabStage stage)
+        internal static void onPrefabStageOpenedOrClosing(PrefabStage stage)
         {
             var root = stage.prefabContentsRoot;
             if (root.GetComponent<VRMMeta>() == null) return;
             RevertVisibility(root);
         }
 
-        private static void Init()
+        internal static void Init()
         {
             if (IsInitialized) return;
             PrefabStage.prefabStageClosing += onPrefabStageOpenedOrClosing;
@@ -97,8 +96,7 @@ namespace VRoidTuner
             IsInitialized = true;
         }
 
-        [MenuItem("VRM/VRoidTuner/Colliders/Begin To Edit Head Colliders (In Prefab Mode)", false)]
-        private static void BeginToEditHeadColliders()
+        internal static void BeginToEditHeadColliders()
         {
             Init();
 
@@ -188,38 +186,7 @@ namespace VRoidTuner
             }
         }
 
-        [MenuItem("VRM/VRoidTuner/Colliders/Commit Edited Colliders", true)]
-        private static bool CommitEditedCollidersValidate()
-        {
-            return AreCollidersActive();
-        }
-
-        [MenuItem("VRM/VRoidTuner/Colliders/Commit Edited Colliders", false)]
-        private static void CommitEditedColliders()
-        {
-            DoCommitEditedColliders(false);
-        }
-
-        [MenuItem("VRM/VRoidTuner/Colliders/Commit Edited Colliders (Symmetrically)", true)]
-        private static bool CommitEditedCollidersSymmetricallyValidate()
-        {
-            return AreCollidersActive();
-        }
-
-        [MenuItem("VRM/VRoidTuner/Colliders/Commit Edited Colliders (Symmetrically)", false)]
-        private static void CommitEditedCollidersSymmetrically()
-        {
-            DoCommitEditedColliders(true);
-        }
-
-        [MenuItem("VRM/VRoidTuner/Colliders/Rollback Colliders", true)]
-        private static bool RollbackCollidersValidate()
-        {
-            return AreCollidersActive();
-        }
-
-        [MenuItem("VRM/VRoidTuner/Colliders/Rollback Colliders", false)]
-        private static void RollbackColliders()
+        internal static void RollbackColliders()
         {
             RevertVisibility();
         }
@@ -227,7 +194,7 @@ namespace VRoidTuner
         /// <summary>
         /// 球の座標とサイズをコライダーに反映し、編集を終了します。
         /// </summary>
-        private static void DoCommitEditedColliders(bool symmetrically = false)
+        internal static void CommitEditedColliders(bool symmetrically = false)
         {
             var root = GetPrefabRootVRM();
             if (root == null) return;
