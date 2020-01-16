@@ -132,14 +132,11 @@ namespace VRoidTuner
                     for (var i=0; i < mesh.materials.Length; i++)
                     {
                         var mat = mesh.materials[i];
-                        if (mat.name.Contains("_Face_") || mat.name.Contains("_FaceMouth_"))
-                        {
-                            var c = mat.GetColor("_Color");
-                            c.a = 0.5f;
-                            mat.SetColor("_Color", c);
-                            mat.SetFloat("_BlendMode", (float)MToon.RenderMode.Transparent);
-                            MToon.Utils.ValidateBlendMode(mat, MToon.RenderMode.Transparent, true);
-                        }
+                        var c = mat.GetColor("_Color");
+                        c.a = mat.name.Contains("_Face_") ? 0.5f : 0f;
+                        mat.SetColor("_Color", c);
+                        mat.SetFloat("_BlendMode", (float)MToon.RenderMode.Transparent);
+                        MToon.Utils.ValidateBlendMode(mat, MToon.RenderMode.Transparent, true);
                     }
                 }
                 if (isFace || isHair || isBody) obj.SetActive(false);
@@ -184,6 +181,7 @@ namespace VRoidTuner
                     i++;
                 }
             }
+            Selection.activeGameObject = clds.GetComponentInChildren<MeshRenderer>().gameObject ?? clds;
         }
 
         internal static void RollbackColliders()
