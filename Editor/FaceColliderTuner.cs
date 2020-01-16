@@ -41,7 +41,7 @@ namespace VRoidTuner
         }
 
         /// <summary>
-        /// 球が作成済みで、かつ表示状態であるときtrueを返します。
+        /// 球が作成済みであるときtrueを返します。
         /// </summary>
         internal static bool AreCollidersActive()
         {
@@ -49,7 +49,7 @@ namespace VRoidTuner
             if (root == null) return false;
             var clds = FindByName("_Colliders_");
             if (clds == null) return false;
-            return clds.activeInHierarchy;
+            return true;
         }
 
         /// <summary>
@@ -68,13 +68,13 @@ namespace VRoidTuner
                 var isHair = obj.name.StartsWith("Hair");
                 var isBody = obj.name == "Body";
                 if (isFace || isHair || isBody) obj.SetActive(true);
-                if (obj.name == "_DummyFace_") obj.SetActive(false); // 半透明の顔は非表示
                 EditorUtility.SetDirty(obj);
+                if (obj.name == "_DummyFace_") DestroyImmediate(obj); // 半透明の顔を削除
             }
 
-            // 球を非表示
+            // 球を削除
             var clds = FindByName("_Colliders_");
-            if (clds != null) clds.SetActive(false);
+            if (clds != null) DestroyImmediate(clds);
 
             EditorUtility.SetDirty(root);
         }
@@ -161,11 +161,11 @@ namespace VRoidTuner
                 var mat = AssetDatabase.LoadAssetAtPath<Material>("Assets/VRoidTuner/Materials/VRoidTunerGizmoMaterial.mat");
 
                 // 球を格納するための親を作成
-                var parent = new GameObject("_Colliders_");
-                parent.transform.parent = head.transform;
-                parent.hideFlags = HideFlags.DontSave;
-                parent.transform.localPosition = new Vector3();
-                parent.transform.localScale = Vector3.one;
+                clds = new GameObject("_Colliders_");
+                clds.transform.parent = head.transform;
+                clds.hideFlags = HideFlags.DontSave;
+                clds.transform.localPosition = new Vector3();
+                clds.transform.localScale = Vector3.one;
 
                 int i = 0;
                 var cgrp = head.GetComponent<VRMSpringBoneColliderGroup>();
@@ -174,7 +174,7 @@ namespace VRoidTuner
                 {
                     // 球を作成
                     var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                    sphere.transform.parent = parent.transform;
+                    sphere.transform.parent = clds.transform;
                     sphere.hideFlags = HideFlags.DontSave;
                     sphere.name = String.Format("Collider{0:000}", i);
                     if (mat != null)
