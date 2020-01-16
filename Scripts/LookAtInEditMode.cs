@@ -9,7 +9,7 @@ using UnityEditor;
 namespace VRoidTuner
 {
 
-    [ExecuteAlways, InitializeOnLoadAttribute]
+    [ExecuteAlways]
     public class LookAtInEditMode : SceneViewRenderer
     {
 
@@ -63,6 +63,7 @@ namespace VRoidTuner
             if (Applyer == null)
             {
                 Applyer = GetComponent<VRMLookAtBoneApplyer>();
+                Applyer.Start();
             }
             if (InterpolatedTarget == null)
             {
@@ -85,14 +86,10 @@ namespace VRoidTuner
             // EditorApplication.playModeStateChanged += OnPlayModeChanged;
         }
 
-        // static LookAtInEditMode() {
-        //     Debug.Log("Play");
-        // }
-
-        // void OnPlayModeChanged(PlayModeStateChange state)
-        // {
-        //     ResetModification();
-        // }
+        internal override void OnInitializeOnLoad()
+        {
+            ResetModification();
+        }
 
         void ResetModification()
         {
@@ -109,13 +106,18 @@ namespace VRoidTuner
             ResetModification();
         }
 
+        Vector3 HeadPosition()
+        {
+            return transform.position + LookAt.Head.position;
+        }
+
         // 頭を中心にSlerpします。
         Vector3 SlerpFromHead(Vector3 from, Vector3 to)
         {
             if (LookAtFrames <= 0) return to;
             // from=1, to=0 として0に漸近する指数関数に見立てる
             float r = Mathf.Pow(0.5f, 1f/LookAtFrames); // 1フレームあたりr倍
-            var head = LookAt.Head.position;
+            var head = HeadPosition();
             from -= head;
             to -= head;
             from.Normalize();
@@ -126,13 +128,13 @@ namespace VRoidTuner
         // 視線の変更角度が大きすぎないかを調べます。
         bool IsSafeAngleGap(Vector3 p1, Vector3 p2)
         {
-            var head = LookAt.Head.position;
+            var head = HeadPosition();
             return Vector3.Angle(p1-head, p2-head) <= SafeAngleGap;
         }
 
         bool IsBehindHead(Vector3 p)
         {
-            return p.z <= LookAt.Head.position.z;
+            return p.z <= HeadPosition().z;
         }
 
         static Vector3 PerpendicularFoot(Ray r, Vector3 from)
@@ -143,7 +145,7 @@ namespace VRoidTuner
         Vector3 WorldMousePosition(Camera camera)
         {
             var ray = camera.ScreenPointToRay(mousePosition);
-            var head = LookAt.Head.position;
+            var head = HeadPosition();
             float t = 0;
             Vector3 q = new Vector3();
             float r = (camera.transform.position - head).magnitude * 0.3f;
@@ -185,7 +187,7 @@ namespace VRoidTuner
             var lookAtMouse = target == camera && !isAltDown && !isTransitional;
             var v = lookAtMouse ? WorldMousePosition(view.camera) : target.position;
             if (DebugMark != null) DebugMark.position = v;
-            // TODO: vをFOVの範囲に吸着
+            // TODO: vをFOVの円錐に吸着 https://qiita.com/FluffyHernia/items/dbc29b27c441e721edd7
             InterpolatedTarget = SlerpFromHead(InterpolatedTarget, v);
             LookAtImmediately(InterpolatedTarget);
 

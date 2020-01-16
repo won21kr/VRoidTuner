@@ -17,10 +17,12 @@ namespace VRoidTuner
 
         internal abstract void OnAwakeInEditor();
         internal abstract void OnDestroyInEditor();
+        internal abstract void OnInitializeOnLoad();
         internal abstract void OnFixedUpdateInEditor(SceneView view);
 
         void Awake()
         {
+            if (Application.IsPlaying(gameObject)) return;
             LastTimestamp = EditorApplication.timeSinceStartup;
             SceneView.duringSceneGui -= OnSceneGUI;
             SceneView.duringSceneGui += OnSceneGUI;
@@ -31,13 +33,21 @@ namespace VRoidTuner
 
         void OnDestroy()
         {
+            if (Application.IsPlaying(gameObject)) return;
             OnDestroyInEditor();
             EditorApplication.update -= OnEditorUpdate;
             SceneView.duringSceneGui -= OnSceneGUI;
         }
 
+        [InitializeOnLoadMethod]
+        void InitializeOnLoad()
+        {
+            OnInitializeOnLoad();
+        }
+
         void OnEditorUpdate()
         {
+            if (Application.IsPlaying(gameObject)) return;
             CallFixedUpdate(SceneView.lastActiveSceneView);
         }
 
@@ -53,6 +63,7 @@ namespace VRoidTuner
 
         void CallFixedUpdate(SceneView view)
         {
+            if (Application.IsPlaying(gameObject)) return;
             for (var i=0; i<MaxFramesAtOnce; i++)
             {
                 if (EditorApplication.timeSinceStartup - LastTimestamp < FrameTime) return;

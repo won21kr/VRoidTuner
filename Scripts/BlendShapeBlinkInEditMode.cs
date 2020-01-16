@@ -27,6 +27,12 @@ namespace VRoidTuner
             }
         }
 
+        internal override void OnInitializeOnLoad()
+        {
+            var blink = GetComponent<BlendShapeBlink>();
+            if (blink != null) blink.ResetBlinking();
+        }
+
         internal override void OnFixedUpdateInEditor(SceneView view)
         {
             var blink = GetComponent<BlendShapeBlink>();
