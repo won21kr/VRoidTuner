@@ -1,9 +1,7 @@
 using System;
-using System.IO;
 using UnityEngine;
 using UnityEditor;
 using VRM;
-using System.Collections.Generic;
 
 namespace VRoidTuner
 {
@@ -80,15 +78,6 @@ namespace VRoidTuner
         [MenuItem("VRM/VRoidTuner/Open Setup Window")]
         private static void Create()
         {
-            caption = new GUIStyle()
-            {
-                alignment = TextAnchor.MiddleLeft,
-                fontStyle = FontStyle.Bold,
-            };
-
-            foldout = new GUIStyle(EditorStyles.foldout);
-            foldout.fontStyle = FontStyle.Bold;
-
             var window = GetWindow<VRoidTuner>("VRoidTuner");
             window.minSize = new Vector2(350, 350);
             window.selectionUpdated();
@@ -119,6 +108,14 @@ namespace VRoidTuner
             {
                 scope = new GUILayout.VerticalScope();
                 GUI.enabled = enabled;
+                if (caption == null)
+                {
+                    caption = new GUIStyle()
+                    {
+                        alignment = TextAnchor.MiddleLeft,
+                        fontStyle = FontStyle.Bold,
+                    };
+                }
                 EditorGUILayout.LabelField(title, caption);
                 EditorGUIUtility.labelWidth = labelWidth;
                 EditorGUI.indentLevel++;
@@ -138,18 +135,24 @@ namespace VRoidTuner
             public void Foldout(string title, Action a)
             {
                 GUI.enabled = true;
+                if (foldout == null)
+                {
+                    foldout = new GUIStyle(EditorStyles.foldout);
+                    foldout.fontStyle = FontStyle.Bold;
+                }
                 isOpen = EditorGUILayout.Foldout(isOpen, title, foldout);
                 if (isOpen)
                 {
                     EditorGUI.indentLevel++;
                     a();
+                    EditorGUILayout.Separator();
                     EditorGUI.indentLevel--;
                 }
             }
         }
 
         private Group SetupGroup = new Group();
-        private Group TwistHairGroup = new Group();
+        private Group EtcGroup = new Group();
 
         private void OnGUI()
         {
@@ -239,7 +242,7 @@ namespace VRoidTuner
                         MessageType.Warning);
                 }
 
-                using (new Section("その他", 270, _vrmSelectedInHierarchy || _vrmSelectedInProject))
+                using (new Section("その他の設定", 270, _vrmSelectedInHierarchy || _vrmSelectedInProject))
                 {
                     _params.ShuffleSpringBoneGizmoColors = EditorGUILayout.Toggle("VRMSpringBone のギズモ色をシャッフル", _params.ShuffleSpringBoneGizmoColors);
                     if (_vrmSelectedInHierarchy) EditorGUILayout.HelpBox(
@@ -253,31 +256,72 @@ namespace VRoidTuner
                     GUILayout.FlexibleSpace();
                     if (GUILayout.Button("適用")) ApplyOptimization();
                 }
-                EditorGUILayout.Separator();
             });
 
-            TwistHairGroup.Foldout("髪束をひねる", () =>
+            EtcGroup.Foldout("その他の操作", () =>
             {
-                if (!_hairJointSelected)
+
+                using (new Section("顔コライダー", 270, FaceColliderTuner.IsVRMPrefabMode()))
                 {
-                    EditorGUILayout.HelpBox("ヒエラルキー内の髪ボーン（HairJoint-*）を選択してください。", MessageType.Error);
+                    if (!FaceColliderTuner.IsVRMPrefabMode())
+                    {
+                        EditorGUILayout.HelpBox("プレハブモードでVRMモデルを編集状態にしてください。", MessageType.Error);
+                        EditorGUILayout.Separator();
+                    }
+
+                    using (new GUILayout.HorizontalScope())
+                    {
+                        GUILayout.FlexibleSpace();
+
+                        GUI.enabled = FaceColliderTuner.IsVRMPrefabMode() && !FaceColliderTuner.AreCollidersActive();
+                        if (GUILayout.Button("編集開始")) FaceColliderTuner.BeginToEditHeadColliders();
+
+                        GUI.enabled = FaceColliderTuner.AreCollidersActive();
+                        if (GUILayout.Button("完了")) FaceColliderTuner.CommitEditedColliders(false);
+                        if (GUILayout.Button("完了(鏡像化)")) FaceColliderTuner.CommitEditedColliders(true);
+                        if (GUILayout.Button("破棄")) FaceColliderTuner.RollbackColliders();
+                    }
+                }
+
+                using (new Section("揺れもの", 270, _vrmSelectedInHierarchy))
+                {
+                    if (!_vrmSelectedInHierarchy)
+                    {
+                        EditorGUILayout.HelpBox("ヒエラルキー内のVRMモデルプレハブを選択してください。", MessageType.Error);
+                        EditorGUILayout.Separator();
+                    }
+
+                    using (new GUILayout.HorizontalScope())
+                    {
+                        GUI.enabled = _vrmSelectedInHierarchy;
+                        GUILayout.FlexibleSpace();
+                        if (GUILayout.Button("揺れものギズモ表示")) HairTuner.ShowAllVRMSpringBoneGizmos(true);
+                        if (GUILayout.Button("非表示")) HairTuner.ShowAllVRMSpringBoneGizmos(false);
+                    }
+                }
+
+                using (new Section("髪束をひねる", 270, _hairJointSelected))
+                {
+                    if (!_hairJointSelected)
+                    {
+                        EditorGUILayout.HelpBox("ヒエラルキー内の髪ボーン（HairJoint-*）を選択してください。", MessageType.Error);
+                        EditorGUILayout.Separator();
+                    }
+
+                    using (new GUILayout.VerticalScope())
+                    {
+                        GUI.enabled = _hairJointSelected;
+                        EditorGUIUtility.labelWidth = 270;
+                        _params.HairJointTwistAngle = EditorGUILayout.FloatField("角度", _params.HairJointTwistAngle);
+                    }
                     EditorGUILayout.Separator();
-                }
 
-                using (new GUILayout.VerticalScope())
-                {
-                    GUI.enabled = _hairJointSelected;
-                    EditorGUIUtility.labelWidth = 270;
-                    _params.HairJointTwistAngle = EditorGUILayout.FloatField("角度", _params.HairJointTwistAngle);
+                    using (new GUILayout.HorizontalScope())
+                    {
+                        GUILayout.FlexibleSpace();
+                        if (GUILayout.Button("適用")) HairTuner.TwistHairJoint(_params.HairJointTwistAngle);
+                    }
                 }
-                EditorGUILayout.Separator();
-
-                using (new GUILayout.HorizontalScope())
-                {
-                    GUILayout.FlexibleSpace();
-                    if (GUILayout.Button("適用")) TwistHairJoint();
-                }
-                EditorGUILayout.Separator();
             });
 
             EditorGUILayout.EndScrollView();
@@ -421,41 +465,6 @@ namespace VRoidTuner
                         EditorUtility.SetDirty(cmp);
                         EditorUtility.SetDirty(cmp.gameObject);
                     }
-                }
-            }
-        }
-
-        private Transform GetFirstChild(Transform t)
-        {
-            foreach (var u in t.GetComponentsInChildren<Transform>())
-            {
-                if (u.parent == t) return u;
-            }
-            return null;
-        }
-
-        private void TwistHairJoint()
-        {
-            foreach (var root in Selection.GetFiltered<Transform>(SelectionMode.TopLevel))
-            {
-                if (!root.name.StartsWith("HairJoint-")) continue;
-
-                // 子孫オブジェクトを先端まで取得
-                var cmps = new List<Transform>();
-                for (var cmp = root; cmp != null; cmp = GetFirstChild(cmp))
-                {
-                    cmps.Add(cmp);
-                }
-
-                var step = _params.HairJointTwistAngle / cmps.Count;
-                var angle = 0f;
-                foreach (var cmp in cmps)
-                {
-                    angle += step;
-                    var a = cmp.eulerAngles;
-                    a.y = angle;
-                    cmp.eulerAngles = a;
-                    EditorUtility.SetDirty(cmp);
                 }
             }
         }
