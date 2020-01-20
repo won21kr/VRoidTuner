@@ -25,6 +25,7 @@ namespace VRoidTuner
         {
             foreach (var root in Selection.GetFiltered<Transform>(SelectionMode.TopLevel))
             {
+                Debug.Log(root.name);
                 if (!root.name.StartsWith("HairJoint-")) continue;
 
                 // 子孫オブジェクトを先端まで取得
@@ -34,15 +35,14 @@ namespace VRoidTuner
                     cmps.Add(cmp);
                 }
 
-                var step = angle / cmps.Count;
-                var a = 0f;
-                foreach (var cmp in cmps)
+                for (var i=cmps.Count-1; 0<=i; i--)
                 {
-                    a += step;
-                    var e = cmp.eulerAngles;
-                    e.y = a;
-                    cmp.eulerAngles = e;
+                    var cmp = cmps[i];
+                    var e = cmp.localEulerAngles;
+                    e.y = angle / cmps.Count;
+                    cmp.localEulerAngles = e;
                     EditorUtility.SetDirty(cmp);
+                    Debug.Log(cmp.gameObject.name + " = " + e);
                 }
             }
         }
