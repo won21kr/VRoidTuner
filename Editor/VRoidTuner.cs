@@ -64,6 +64,8 @@ namespace VRoidTuner
                 set { _HairJointTwistAngle = Mathf.Clamp(value, -3600, 3600); }
             }
 
+            internal VRMMeta CopyPoseFrom = null;
+
         }
 
         static GUIStyle caption;
@@ -322,6 +324,34 @@ namespace VRoidTuner
                         if (GUILayout.Button("適用")) HairTuner.TwistHairJoint(_params.HairJointTwistAngle);
                     }
                 }
+
+                using (new Section("姿勢をコピー", 270, true))
+                {
+                    if (_params.CopyPoseFrom == null)
+                    {
+                        EditorGUILayout.HelpBox("コピー元VRMモデルを指定してください。", MessageType.Error);
+                        EditorGUILayout.Separator();
+                    }
+                    using (new GUILayout.VerticalScope())
+                    {
+                        EditorGUIUtility.labelWidth = 270;
+                        _params.CopyPoseFrom = (VRMMeta)EditorGUILayout.ObjectField("コピー元", _params.CopyPoseFrom, typeof(VRMMeta), true);
+                    }
+                    EditorGUILayout.Separator();
+
+                    if (!_vrmSelectedInHierarchy)
+                    {
+                        EditorGUILayout.HelpBox("ヒエラルキー内のコピー先VRMモデルを選択してください。", MessageType.Error);
+                        EditorGUILayout.Separator();
+                    }
+                    using (new GUILayout.HorizontalScope())
+                    {
+                        GUI.enabled = _params.CopyPoseFrom != null;
+                        GUILayout.FlexibleSpace();
+                        if (GUILayout.Button("実行")) CopyPose();
+                    }
+                }
+
             });
 
             EditorGUILayout.EndScrollView();
@@ -466,6 +496,31 @@ namespace VRoidTuner
                         EditorUtility.SetDirty(cmp.gameObject);
                     }
                 }
+            }
+        }
+
+        private void CopyPose()
+        {
+            if (_params.CopyPoseFrom == null) return;
+            var from = _params.CopyPoseFrom.transform;
+            foreach (var vrm in Helper.FindAllComponentsInSelected<VRMMeta>())
+            {
+                var to = vrm.gameObject.transform;
+                CopyTransform(from.Find("Root"), to.Find("Root"));
+            }
+        }
+
+        private static void CopyTransform(Transform from, Transform to)
+        {
+            to.localPosition = from.localPosition;
+            to.localRotation = from.localRotation;
+            to.localScale = from.localScale;
+            for (var i=0; i<from.childCount; i++)
+            {
+                var fromChild = from.GetChild(i);
+                var toChild = to.Find(fromChild.name);
+                if (toChild == null) continue;
+                CopyTransform(fromChild, toChild);
             }
         }
 
