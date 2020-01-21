@@ -63,7 +63,7 @@ namespace VRoidTuner
             if (Applyer == null)
             {
                 Applyer = GetComponent<VRMLookAtBoneApplyer>();
-                Applyer.Start();
+                Applyer.SendMessage("Start"); // FIXME: Start() を直接呼ばないとダメかも
             }
             if (InterpolatedTarget == null)
             {
