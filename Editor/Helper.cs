@@ -67,24 +67,6 @@ namespace VRoidTuner
             return GetAllComponents<T>(objs);
         }
 
-        /// <summary>
-        /// ヒエラルキー中およびプロジェクトアセット中で選択中のオブジェクトがVRMモデルであるかを調べます。
-        /// </summary>
-        internal static (bool inHierarchy, bool inProject) IsVRMSelected()
-        {
-            var inHierarchy = false;
-            var inProject = false;
-            foreach (var obj in Selection.GetFiltered<GameObject>(SelectionMode.TopLevel))
-            {
-                if (obj.GetComponents<VRMMeta>().Length == 0) continue;
-                if (AssetDatabase.Contains(obj))
-                    inProject = true;
-                else
-                    inHierarchy = true;
-            }
-            return (inHierarchy, inProject);
-        }
-
     }
 
 }

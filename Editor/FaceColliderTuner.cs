@@ -4,7 +4,9 @@ using UnityEditor;
 using VRM;
 using System.Linq;
 using System.Collections.Generic;
+#if UNITY_2018_3_OR_NEWER
 using UnityEditor.Experimental.SceneManagement;
+#endif
 
 namespace VRoidTuner
 {
@@ -22,11 +24,15 @@ namespace VRoidTuner
 
         internal static GameObject GetPrefabRootVRM()
         {
+#if UNITY_2018_3_OR_NEWER
             var stage = PrefabStageUtility.GetCurrentPrefabStage();
             if (stage == null) return null;
             var result = stage.prefabContentsRoot;
             if (result.GetComponent<VRMMeta>() == null) return null;
             return result;
+#else
+            return null;
+#endif
         }
 
         internal static GameObject FindByName(string name)
@@ -81,18 +87,22 @@ namespace VRoidTuner
 
         internal static bool IsInitialized = false;
 
+#if UNITY_2018_3_OR_NEWER
         internal static void onPrefabStageOpenedOrClosing(PrefabStage stage)
         {
             var root = stage.prefabContentsRoot;
             if (root.GetComponent<VRMMeta>() == null) return;
             RevertVisibility(root);
         }
+#endif
 
         internal static void Init()
         {
             if (IsInitialized) return;
+#if UNITY_2018_3_OR_NEWER
             PrefabStage.prefabStageClosing += onPrefabStageOpenedOrClosing;
             PrefabStage.prefabStageOpened += onPrefabStageOpenedOrClosing;
+#endif
             IsInitialized = true;
         }
 
@@ -106,8 +116,12 @@ namespace VRoidTuner
             var head = FindByName("J_Bip_C_Head");
             if (head == null) throw new Exception("J_Bip_C_Head が見つかりません");
 
+#if UNITY_2018_3_OR_NEWER
             var stage = PrefabStageUtility.GetCurrentPrefabStage();
             if (stage == null) return;
+#else
+            return;
+#endif
 
             // 半透明の顔が既にある場合は表示
             var dummyFace = FindByName("_DummyFace_");
@@ -213,19 +227,19 @@ namespace VRoidTuner
             var clds = FindByName("_Colliders_");
             if (clds == null) throw new Exception("_Colliders_ が見つかりません");
 
-            var result = Enumerable.Empty<VRMSpringBoneColliderGroup.SphereCollider>();
+            var result = new List<VRMSpringBoneColliderGroup.SphereCollider>();
             foreach (var cld in clds.GetComponentsInChildren<SphereCollider>())
             {
                 var t = cld.GetComponent<Transform>();
                 var radius = t.localScale.magnitude / Vector3.one.magnitude / 2;
                 var offset = t.localPosition;
                 var c = new VRMSpringBoneColliderGroup.SphereCollider{ Radius = radius, Offset = offset };
-                result = result.Append(c);
+                result.Add(c);
                 if (symmetrically && 0.001f <= Math.Abs(offset.x))
                 {
                     var offset2 = new Vector3(-offset.x, offset.y, offset.z);
                     var c2 = new VRMSpringBoneColliderGroup.SphereCollider{ Radius = radius, Offset = offset2 };
-                    result = result.Append(c2);
+                    result.Add(c2);
                 }
             }
             if (result.Count() == 0) throw new Exception("球が見つかりません");

@@ -92,8 +92,6 @@ namespace VRoidTuner
 
         private void selectionUpdated()
         {
-            (_vrmSelectedInHierarchy, _vrmSelectedInProject) = Helper.IsVRMSelected();
-
             _hairJointSelected = false;
             foreach (var obj in Selection.GetFiltered<GameObject>(SelectionMode.TopLevel))
             {
